@@ -12467,26 +12467,23 @@ Ils seront préservés lors de l'affichage !"></textarea>
                             audioChunks.push(event.data);
                         };
                         
-                        mediaRecorder.onstop = async () => {
+                        mediaRecorder.onstop = () => {
+                            // Build blob immediately — no async, no compression that can crash
                             const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                            
-                            // Compress audio before storing
-                            const compressedBlob = await compressAudio(audioBlob);
-                            
-                            // Create URL for preview
-                            const audioURL = URL.createObjectURL(compressedBlob);
-                            currentRecording = compressedBlob; // Store blob instead of base64!
-                            
+                            const audioURL = URL.createObjectURL(audioBlob);
+                            currentRecording = audioBlob;
+
                             spokenText.innerHTML = `
                                 <audio controls style="width: 100%; margin-top: 1rem;">
-                                    <source src="${audioURL}" type="audio/wav">
+                                    <source src="${audioURL}" type="audio/webm">
                                 </audio>
                                 <p style="font-size: 0.85rem; color: var(--text); margin-top: 0.5rem;">
-                                    📊 Taille: ${(compressedBlob.size / 1024).toFixed(0)} KB (compressé)
+                                    📊 Taille: ${(audioBlob.size / 1024).toFixed(0)} KB
                                 </p>
                             `;
+                            // Show save button + note field
                             controls.style.display = 'flex';
-                            
+
                             // Stop all tracks
                             stream.getTracks().forEach(track => track.stop());
                         };
