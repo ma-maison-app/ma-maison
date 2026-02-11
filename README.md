@@ -342,12 +342,13 @@ const FirebaseREST = {
 console.log('✅ Firebase REST ready!');
 
 const firebaseConfig = {
-    apiKey: "AIzaSyBMb0vvGcCqEQREhUeNr6odUn0xPbSA96A",
-    authDomain: "ma-maison-app-9ff93.firebaseapp.com",
-    projectId: "ma-maison-app-9ff93",
-    storageBucket: "ma-maison-app-9ff93.firebasestorage.app",
-    messagingSenderId: "874510508050",
-    appId: "1:874510508050:web:7ee47a413e49caba4238cb"
+    apiKey: "AIzaSyD5l89evtb8svRKoTVICAVwA4JbpoXjJKQ",
+    authDomain: "ma-maison-french.firebaseapp.com",
+    projectId: "ma-maison-french",
+    storageBucket: "ma-maison-french.firebasestorage.app",
+    messagingSenderId: "319573050083",
+    appId: "1:319573050083:web:11ff8453f39cce3160fbd6",
+    measurementId: "G-JP9BNPQX0B"
 };
 
 // Initialize Firebase (must be async now)
