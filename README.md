@@ -11280,41 +11280,45 @@ Ils seront préservés lors de l'affichage !"></textarea>
 
         async function editListening(id) {
             console.log('✏️ Editing item:', id, 'Type:', typeof id);
-            
-            // First, try to sync from Firebase to get latest data
-            try {
-                await syncFromFirebase();
-                console.log('✅ Synced from Firebase before edit');
-            } catch (e) {
-                console.warn('⚠️ Firebase sync failed, using local data:', e);
-            }
+            console.log('📊 listeningList length BEFORE anything:', listeningList.length);
+            console.log('📋 All IDs in list:', listeningList.map(l => l.id));
             
             // Ensure ID is a number for comparison
             const numericId = Number(id);
+            console.log('🔍 Looking for ID:', numericId);
+            
             const item = listeningList.find(l => Number(l.id) === numericId);
+            console.log('🎯 Found item?', !!item);
+            
             if (!item) {
-                console.error('❌ Item not found after sync!', numericId);
+                console.error('❌ Item not found!', numericId);
                 console.log('📋 Available IDs:', listeningList.map(l => ({ id: l.id, type: typeof l.id })));
                 
                 // Try one more time with localStorage
                 try {
                     const freshData = localStorage.getItem('listeningList');
                     if (freshData) {
-                        listeningList = JSON.parse(freshData);
+                        const parsedData = JSON.parse(freshData);
+                        console.log('📦 LocalStorage has', parsedData.length, 'items');
+                        listeningList = parsedData;
                         const retryItem = listeningList.find(l => Number(l.id) === numericId);
                         if (retryItem) {
-                            console.log('✅ Found item in localStorage');
+                            console.log('✅ Found item in localStorage!');
                             renderListeningList();
                             // Try again with the found item
                             setTimeout(() => editListening(numericId), 100);
                             return;
+                        } else {
+                            console.error('❌ Not in localStorage either. IDs:', parsedData.map(l => l.id));
                         }
+                    } else {
+                        console.error('❌ No localStorage data!');
                     }
                 } catch (e) {
                     console.error('Failed to reload:', e);
                 }
                 
-                alert(`❌ ERROR: Item not found! ID: ${numericId}`);
+                alert(`❌ ERROR: Item not found! ID: ${numericId}\n\nCheck console for details (F12)`);
                 return;
             }
 
