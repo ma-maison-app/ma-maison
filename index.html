@@ -6388,7 +6388,10 @@ const firebaseConfig = {
                     </button>
                 </div>
 
-                <div style="text-align: center;">
+                <div style="text-align: center; display: flex; gap: 1rem; justify-content: center; align-items: center;">
+                    <button class="btn btn-secondary" onclick="forceRefreshListeningList()" title="Actualiser les données">
+                        🔄 Actualiser
+                    </button>
                     <button class="btn btn-primary" id="add-listening-btn">Ajouter du contenu</button>
                 </div>
             </div>
@@ -11114,6 +11117,46 @@ Ils seront préservés lors de l'affichage !"></textarea>
             renderListeningList();
         };
 
+        // Manual refresh function - sync from Firebase and re-render
+        async function forceRefreshListeningList() {
+            console.log('🔄 Manual refresh triggered');
+            
+            // Show loading feedback
+            const grid = document.getElementById('listening-grid');
+            if (grid) {
+                grid.innerHTML = '<div style="text-align:center; padding:40px; color:#8b4654;">🔄 Actualisation...</div>';
+            }
+            
+            try {
+                // Sync from Firebase
+                await syncFromFirebase();
+                console.log('✅ Data refreshed from Firebase');
+                
+                // Re-render the list
+                renderListeningList();
+                
+                // Show success feedback
+                alert('✅ Données actualisées!');
+            } catch (error) {
+                console.error('❌ Refresh failed:', error);
+                
+                // Try localStorage as backup
+                try {
+                    const freshData = localStorage.getItem('listeningList');
+                    if (freshData) {
+                        listeningList = JSON.parse(freshData);
+                        renderListeningList();
+                        alert('✅ Données chargées depuis le cache local');
+                    } else {
+                        alert('❌ Échec de l\'actualisation. Vérifiez votre connexion.');
+                    }
+                } catch (e) {
+                    alert('❌ Erreur lors du chargement des données');
+                    renderListeningList();
+                }
+            }
+        }
+
         function renderListeningList() {
             const grid = document.getElementById('listening-grid');
             
@@ -11125,7 +11168,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
             
             if (filteredList.length === 0) {
                 const emptyMessage = currentListeningCategory === 'all' 
-                    ? 'Rien ici encore...' 
+                    ? 'Rien ici encore... Clique sur "Ajouter du contenu" pour commencer!' 
                     : 'Aucun contenu dans cette catégorie';
                     
                 grid.innerHTML = `
@@ -11207,22 +11250,40 @@ Ils seront préservés lors de l'affichage !"></textarea>
             `).join('');
         }
 
-        function editListening(id) {
+        async function editListening(id) {
             console.log('✏️ Editing item:', id);
+            
+            // First, try to sync from Firebase to get latest data
+            try {
+                await syncFromFirebase();
+                console.log('✅ Synced from Firebase before edit');
+            } catch (e) {
+                console.warn('⚠️ Firebase sync failed, using local data:', e);
+            }
+            
             const item = listeningList.find(l => l.id === id);
             if (!item) {
-                console.error('❌ Item not found in current data!', id);
-                alert('Erreur: Élément introuvable. Actualisez la page (glissez vers le bas pour recharger).');
-                // Force reload from localStorage and re-render
+                console.error('❌ Item not found after sync!', id);
+                
+                // Try one more time with localStorage
                 try {
                     const freshData = localStorage.getItem('listeningList');
                     if (freshData) {
                         listeningList = JSON.parse(freshData);
-                        renderListeningList();
+                        const retryItem = listeningList.find(l => l.id === id);
+                        if (retryItem) {
+                            console.log('✅ Found item in localStorage');
+                            renderListeningList();
+                            // Try again with the found item
+                            setTimeout(() => editListening(id), 100);
+                            return;
+                        }
                     }
                 } catch (e) {
                     console.error('Failed to reload:', e);
                 }
+                
+                alert('❌ Élément introuvable. Essayez de rafraîchir avec le bouton 🔄 en haut à droite.');
                 return;
             }
 
@@ -15813,15 +15874,23 @@ Ils seront préservés lors de l'affichage !"></textarea>
         }
 
         // Open listening player
-        window.openListeningPlayer = function(itemId) {
+        window.openListeningPlayer = async function(itemId) {
             console.log('🎵 openListeningPlayer called for itemId:', itemId);
             
-            // FORCE reload from localStorage to ensure fresh data
+            // First, try to sync from Firebase to get latest data
+            try {
+                await syncFromFirebase();
+                console.log('✅ Synced from Firebase before opening player');
+            } catch (e) {
+                console.warn('⚠️ Firebase sync failed, trying localStorage:', e);
+            }
+            
+            // Try localStorage as backup
             try {
                 const freshData = localStorage.getItem('listeningList');
                 if (freshData) {
                     const freshList = JSON.parse(freshData);
-                    console.log('🔄 Force-reloaded listeningList from localStorage');
+                    console.log('🔄 Loaded from localStorage');
                     listeningList = freshList;
                 }
             } catch (e) {
@@ -15830,18 +15899,9 @@ Ils seront préservés lors de l'affichage !"></textarea>
             
             const item = listeningList.find(l => l.id === itemId);
             if (!item) {
-                console.error('❌ Item not found in current data!');
-                alert('Erreur: Élément introuvable. Actualisez la page (glissez vers le bas pour recharger).');
-                // Force reload and re-render
-                try {
-                    const freshData = localStorage.getItem('listeningList');
-                    if (freshData) {
-                        listeningList = JSON.parse(freshData);
-                        renderListeningList();
-                    }
-                } catch (e) {
-                    console.error('Failed to reload:', e);
-                }
+                console.error('❌ Item not found after sync!');
+                alert('❌ Élément introuvable. Essayez de rafraîchir avec le bouton 🔄.');
+                renderListeningList();
                 return;
             }
 
