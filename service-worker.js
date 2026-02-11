@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ma-maison-v9-ID-FIX-COMPLETE';
+const CACHE_NAME = 'ma-maison-v10-cloudinary';
 const urlsToCache = [
   './',
   'https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&family=Work+Sans:wght@300;400;500&family=Allura&display=swap',
@@ -8,12 +8,11 @@ const urlsToCache = [
 
 // Install event - cache resources
 self.addEventListener('install', (event) => {
-  console.log('Service Worker: Installing v8 (ID FIX COMPLETE)...');
+  console.log('Service Worker: Installing v10 (Cloudinary)...');
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
         console.log('Service Worker: Caching files');
-        // Cache files individually so one failure doesn't break everything
         return Promise.allSettled(
           urlsToCache.map(url => 
             cache.add(url).catch(err => {
@@ -35,7 +34,7 @@ self.addEventListener('install', (event) => {
 
 // Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
-  console.log('Service Worker: Activating v8...');
+  console.log('Service Worker: Activating v10...');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
@@ -47,7 +46,7 @@ self.addEventListener('activate', (event) => {
         })
       );
     }).then(() => {
-      console.log('Service Worker: v8 activated, claiming clients');
+      console.log('Service Worker: v10 activated, claiming clients');
       return self.clients.claim();
     })
   );
@@ -58,12 +57,13 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // ⚠️ CRITICAL: Skip ALL Firebase API requests - don't cache them!
+  // ⚠️ CRITICAL: Skip ALL Firebase + Cloudinary requests - never cache them!
   if (url.hostname.includes('googleapis.com') || 
       url.hostname.includes('firebaseio.com') ||
       url.hostname.includes('firestore.googleapis.com') ||
-      url.hostname.includes('identitytoolkit.googleapis.com')) {
-    // Let Firebase requests pass through directly - DO NOT CACHE
+      url.hostname.includes('identitytoolkit.googleapis.com') ||
+      url.hostname.includes('cloudinary.com') ||        // ← audio uploads/playback
+      url.hostname.includes('res.cloudinary.com')) {    // ← Cloudinary media CDN
     return;
   }
 
@@ -77,7 +77,6 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          // Cache the new version for offline use
           if (response && response.ok) {
             const responseToCache = response.clone();
             caches.open(CACHE_NAME).then((cache) => {
@@ -88,7 +87,6 @@ self.addEventListener('fetch', (event) => {
           return response;
         })
         .catch(() => {
-          // Only use cache if network fails (offline)
           console.log('Service Worker: Network failed, serving from cache:', url.pathname);
           return caches.match(request).then((cached) => {
             return cached || caches.match('./index.html');
@@ -101,29 +99,23 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(request)
       .then((response) => {
-        // Cache hit - return cached response
         if (response) {
           return response;
         }
 
-        // Clone the request
         const fetchRequest = request.clone();
 
         return fetch(fetchRequest).then((response) => {
-          // Check if valid response - accept both basic and cors types
           if (!response || !response.ok) {
             return response;
           }
 
-          // Only cache basic and cors responses (not opaque)
           if (response.type !== 'basic' && response.type !== 'cors') {
             return response;
           }
 
-          // Clone the response
           const responseToCache = response.clone();
 
-          // Cache the fetched resource
           caches.open(CACHE_NAME)
             .then((cache) => {
               cache.put(request, responseToCache);
@@ -131,7 +123,6 @@ self.addEventListener('fetch', (event) => {
 
           return response;
         }).catch(() => {
-          // Return a custom offline page if available
           return caches.match('./index.html');
         });
       })
@@ -141,14 +132,11 @@ self.addEventListener('fetch', (event) => {
 // Background sync for Firebase data (when online)
 self.addEventListener('sync', (event) => {
   if (event.tag === 'sync-firebase') {
-    event.waitUntil(
-      // Your Firebase sync logic here
-      Promise.resolve()
-    );
+    event.waitUntil(Promise.resolve());
   }
 });
 
-// Push notifications (optional - for future features)
+// Push notifications
 self.addEventListener('push', (event) => {
   const options = {
     body: event.data ? event.data.text() : 'Notification from Ma Maison',
