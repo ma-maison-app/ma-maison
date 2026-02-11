@@ -11279,49 +11279,124 @@ Ils seront préservés lors de l'affichage !"></textarea>
         }
 
         async function editListening(id) {
-            console.log('✏️ Editing item:', id, 'Type:', typeof id);
-            console.log('📊 listeningList length BEFORE anything:', listeningList.length);
-            console.log('📋 All IDs in list:', listeningList.map(l => l.id));
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            console.log('✏️ EDIT LISTENING CALLED');
+            console.log('📥 Received ID:', id, 'Type:', typeof id);
             
-            // Ensure ID is a number for comparison
-            const numericId = Number(id);
-            console.log('🔍 Looking for ID:', numericId);
+            // STEP 1: Check if user is logged in
+            if (!window.currentUser) {
+                console.warn('⚠️ User not logged in!');
+                alert('Connecte-toi d\'abord pour modifier tes données!');
+                openModal('auth-modal');
+                return;
+            }
             
-            const item = listeningList.find(l => Number(l.id) === numericId);
-            console.log('🎯 Found item?', !!item);
-            
-            if (!item) {
-                console.error('❌ Item not found!', numericId);
-                console.log('📋 Available IDs:', listeningList.map(l => ({ id: l.id, type: typeof l.id })));
+            // STEP 2: Check if listeningList exists and has items
+            console.log('📊 Current listeningList length:', listeningList ? listeningList.length : 'undefined');
+            if (!listeningList || listeningList.length === 0) {
+                console.warn('⚠️ listeningList is empty or undefined!');
+                console.log('🔄 Attempting to reload from localStorage...');
                 
-                // Try one more time with localStorage
+                try {
+                    const freshData = localStorage.getItem('listeningList');
+                    if (freshData) {
+                        listeningList = JSON.parse(freshData);
+                        console.log('✅ Reloaded from localStorage:', listeningList.length, 'items');
+                    } else {
+                        console.error('❌ No data in localStorage either!');
+                        alert('Aucune donnée trouvée. Rafraîchis la page avec le bouton 🔄 en haut à droite.');
+                        return;
+                    }
+                } catch (e) {
+                    console.error('❌ Failed to load from localStorage:', e);
+                    alert('Erreur de chargement. Rafraîchis la page.');
+                    return;
+                }
+            }
+            
+            // STEP 3: Normalize ID to number
+            const numericId = Number(id);
+            console.log('🔍 Searching for ID:', numericId);
+            console.log('📋 Available IDs:', listeningList.map(l => l.id));
+            console.log('📋 ID types:', listeningList.map(l => ({ id: l.id, type: typeof l.id })));
+            
+            // STEP 4: Find the item with multiple fallback strategies
+            let item = null;
+            
+            // Strategy 1: Strict Number comparison
+            item = listeningList.find(l => Number(l.id) === numericId);
+            if (item) {
+                console.log('✅ Found with Number() comparison');
+            }
+            
+            // Strategy 2: Loose comparison (==) as fallback
+            if (!item) {
+                console.log('⚠️ Trying loose comparison...');
+                item = listeningList.find(l => l.id == numericId);
+                if (item) {
+                    console.log('✅ Found with loose comparison');
+                }
+            }
+            
+            // Strategy 3: String comparison as last resort
+            if (!item) {
+                console.log('⚠️ Trying string comparison...');
+                item = listeningList.find(l => String(l.id) === String(numericId));
+                if (item) {
+                    console.log('✅ Found with string comparison');
+                }
+            }
+            
+            // STEP 5: If still not found, try reloading from localStorage one more time
+            if (!item) {
+                console.error('❌ Item not found in memory. Last attempt: localStorage...');
+                
                 try {
                     const freshData = localStorage.getItem('listeningList');
                     if (freshData) {
                         const parsedData = JSON.parse(freshData);
                         console.log('📦 LocalStorage has', parsedData.length, 'items');
-                        listeningList = parsedData;
-                        const retryItem = listeningList.find(l => Number(l.id) === numericId);
-                        if (retryItem) {
-                            console.log('✅ Found item in localStorage!');
+                        console.log('📦 LocalStorage IDs:', parsedData.map(l => l.id));
+                        
+                        // Try all comparison strategies on fresh data
+                        item = parsedData.find(l => Number(l.id) === numericId) ||
+                               parsedData.find(l => l.id == numericId) ||
+                               parsedData.find(l => String(l.id) === String(numericId));
+                        
+                        if (item) {
+                            console.log('✅ Found in localStorage! Reloading list...');
+                            listeningList = parsedData;
                             renderListeningList();
-                            // Try again with the found item
-                            setTimeout(() => editListening(numericId), 100);
-                            return;
                         } else {
-                            console.error('❌ Not in localStorage either. IDs:', parsedData.map(l => l.id));
+                            console.error('❌ Not in localStorage either');
+                            console.error('Searched for:', numericId);
+                            console.error('Available:', parsedData.map(l => l.id));
                         }
                     } else {
-                        console.error('❌ No localStorage data!');
+                        console.error('❌ No localStorage data');
                     }
                 } catch (e) {
-                    console.error('Failed to reload:', e);
+                    console.error('❌ LocalStorage read failed:', e);
                 }
+            }
+            
+            // STEP 6: Final check - if STILL not found, give up gracefully
+            if (!item) {
+                console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                console.error('❌ COMPLETE FAILURE - Item not found anywhere');
+                console.error('Searched ID:', numericId);
+                console.error('Available IDs:', listeningList.map(l => l.id));
+                console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
                 
-                alert(`❌ ERROR: Item not found! ID: ${numericId}\n\nCheck console for details (F12)`);
+                alert('Cet élément n\'existe plus.\n\nRafraîchis la page avec le bouton 🔄 en haut à droite.');
+                renderListeningList(); // Re-render to show current state
                 return;
             }
 
+            // STEP 7: SUCCESS! Open the edit modal
+            console.log('✅ Item found:', item.title);
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            
             document.getElementById('edit-listening-id').value = numericId;
             document.getElementById('edit-listening-type').value = item.type;
             document.getElementById('edit-listening-title').value = item.title;
@@ -15977,48 +16052,83 @@ Ils seront préservés lors de l'affichage !"></textarea>
 
         // Open listening player
         window.openListeningPlayer = async function(itemId) {
-            console.log('🎵 openListeningPlayer called for itemId:', itemId, 'Type:', typeof itemId);
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            console.log('🎵 OPEN LISTENING PLAYER CALLED');
+            console.log('📥 Received ID:', itemId, 'Type:', typeof itemId);
             
-            // First, try to sync from Firebase to get latest data
-            try {
-                await syncFromFirebase();
-                console.log('✅ Synced from Firebase before opening player');
-            } catch (e) {
-                console.warn('⚠️ Firebase sync failed, trying localStorage:', e);
+            // STEP 1: Check if user is logged in
+            if (!window.currentUser) {
+                console.warn('⚠️ User not logged in!');
+                alert('Connecte-toi d\'abord pour écouter!');
+                openModal('auth-modal');
+                return;
             }
             
-            // Try localStorage as backup
-            try {
-                const freshData = localStorage.getItem('listeningList');
-                if (freshData) {
-                    const freshList = JSON.parse(freshData);
-                    console.log('🔄 Loaded from localStorage');
-                    listeningList = freshList;
+            // STEP 2: Ensure listeningList exists
+            if (!listeningList || listeningList.length === 0) {
+                console.warn('⚠️ listeningList is empty!');
+                try {
+                    const freshData = localStorage.getItem('listeningList');
+                    if (freshData) {
+                        listeningList = JSON.parse(freshData);
+                        console.log('✅ Loaded from localStorage:', listeningList.length, 'items');
+                    } else {
+                        alert('Aucune donnée. Rafraîchis la page.');
+                        return;
+                    }
+                } catch (e) {
+                    console.error('❌ Failed to load:', e);
+                    alert('Erreur de chargement. Rafraîchis la page.');
+                    return;
                 }
-            } catch (e) {
-                console.error('Failed to reload from localStorage:', e);
             }
             
-            // Ensure numeric comparison
+            // STEP 3: Find item with multiple strategies
             const numericId = Number(itemId);
             console.log('🔍 Searching for ID:', numericId);
-            console.log('📋 Available IDs:', listeningList.map(l => ({ id: l.id, type: typeof l.id })));
+            console.log('📋 Available IDs:', listeningList.map(l => l.id));
             
-            const item = listeningList.find(l => Number(l.id) === numericId);
+            let item = listeningList.find(l => Number(l.id) === numericId) ||
+                       listeningList.find(l => l.id == numericId) ||
+                       listeningList.find(l => String(l.id) === String(numericId));
+            
             if (!item) {
-                console.error('❌ Item not found after sync! ID:', numericId);
-                alert(`❌ ERROR: Item not found! ID: ${numericId}`);
+                console.error('❌ Item not found! Trying localStorage...');
+                try {
+                    const freshData = localStorage.getItem('listeningList');
+                    if (freshData) {
+                        const parsedData = JSON.parse(freshData);
+                        item = parsedData.find(l => Number(l.id) === numericId) ||
+                               parsedData.find(l => l.id == numericId) ||
+                               parsedData.find(l => String(l.id) === String(numericId));
+                        
+                        if (item) {
+                            console.log('✅ Found in localStorage!');
+                            listeningList = parsedData;
+                            renderListeningList();
+                        }
+                    }
+                } catch (e) {
+                    console.error('❌ LocalStorage failed:', e);
+                }
+            }
+            
+            if (!item) {
+                console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                console.error('❌ COMPLETE FAILURE - Item not found');
+                console.error('Searched ID:', numericId);
+                console.error('Available:', listeningList.map(l => l.id));
+                console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                alert('Cet élément n\'existe plus. Rafraîchis la page.');
                 renderListeningList();
                 return;
             }
 
-            console.log('📦 Found item:', item.title);
+            console.log('✅ Found item:', item.title);
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            
             console.log('📝 Item.transcript exists?', !!item.transcript);
-            console.log('📝 Item.transcript type:', typeof item.transcript);
-            console.log('📝 Item.transcript length:', item.transcript ? item.transcript.length : 'N/A');
-            console.log('📝 Item.transcript value:', item.transcript);
             console.log('📝 Item.transcriptText exists?', !!item.transcriptText);
-            console.log('📝 Item.transcriptText:', item.transcriptText);
             
             // If transcript is missing but transcriptText exists, re-parse it
             if (!item.transcript && item.transcriptText) {
