@@ -399,6 +399,178 @@ const firebaseConfig = {
         alert('Firebase initialization failed. Check console for details.');
     }
     
+    // ============================================
+    // INDEXEDDB FOR AUDIO RECORDINGS
+    // ============================================
+    const AudioStorage = {
+        dbName: 'MaMaisonAudio',
+        storeName: 'recordings',
+        db: null,
+        
+        async init() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(this.dbName, 1);
+                
+                request.onerror = () => reject(request.error);
+                request.onsuccess = () => {
+                    this.db = request.result;
+                    console.log('✅ IndexedDB for audio initialized');
+                    resolve(this.db);
+                };
+                
+                request.onupgradeneeded = (event) => {
+                    const db = event.target.result;
+                    if (!db.objectStoreNames.contains(this.storeName)) {
+                        db.createObjectStore(this.storeName, { keyPath: 'id' });
+                        console.log('✅ IndexedDB object store created');
+                    }
+                };
+            });
+        },
+        
+        async saveRecording(id, audioBlob) {
+            if (!this.db) await this.init();
+            
+            return new Promise((resolve, reject) => {
+                const transaction = this.db.transaction([this.storeName], 'readwrite');
+                const store = transaction.objectStore(this.storeName);
+                const request = store.put({ id, audioBlob, timestamp: Date.now() });
+                
+                request.onsuccess = () => {
+                    console.log('✅ Audio saved to IndexedDB:', id);
+                    resolve();
+                };
+                request.onerror = () => reject(request.error);
+            });
+        },
+        
+        async getRecording(id) {
+            if (!this.db) await this.init();
+            
+            return new Promise((resolve, reject) => {
+                const transaction = this.db.transaction([this.storeName], 'readonly');
+                const store = transaction.objectStore(this.storeName);
+                const request = store.get(id);
+                
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        },
+        
+        async deleteRecording(id) {
+            if (!this.db) await this.init();
+            
+            return new Promise((resolve, reject) => {
+                const transaction = this.db.transaction([this.storeName], 'readwrite');
+                const store = transaction.objectStore(this.storeName);
+                const request = store.delete(id);
+                
+                request.onsuccess = () => resolve();
+                request.onerror = () => reject(request.error);
+            });
+        }
+    };
+    
+    // ============================================
+    // AUDIO COMPRESSION
+    // ============================================
+    async function compressAudio(audioBlob) {
+        try {
+            console.log('🔊 Original audio size:', (audioBlob.size / 1024 / 1024).toFixed(2), 'MB');
+            
+            // Create audio context
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const arrayBuffer = await audioBlob.arrayBuffer();
+            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+            
+            // Create offline context with lower sample rate (compress!)
+            const sampleRate = 22050; // Down from 48000 - saves ~50% space
+            const offlineContext = new OfflineAudioContext(
+                1, // mono instead of stereo - saves 50% space
+                audioBuffer.duration * sampleRate,
+                sampleRate
+            );
+            
+            // Create buffer source
+            const source = offlineContext.createBufferSource();
+            source.buffer = audioBuffer;
+            source.connect(offlineContext.destination);
+            source.start();
+            
+            // Render compressed audio
+            const compressedBuffer = await offlineContext.startRendering();
+            
+            // Convert back to blob with lower bitrate
+            const wav = audioBufferToWav(compressedBuffer);
+            const compressedBlob = new Blob([wav], { type: 'audio/wav' });
+            
+            console.log('✅ Compressed audio size:', (compressedBlob.size / 1024 / 1024).toFixed(2), 'MB');
+            console.log('📊 Compression ratio:', ((1 - compressedBlob.size / audioBlob.size) * 100).toFixed(1) + '% smaller');
+            
+            return compressedBlob;
+        } catch (error) {
+            console.warn('⚠️ Audio compression failed, using original:', error);
+            return audioBlob;
+        }
+    }
+    
+    // Convert AudioBuffer to WAV format
+    function audioBufferToWav(buffer) {
+        const length = buffer.length * buffer.numberOfChannels * 2;
+        const arrayBuffer = new ArrayBuffer(44 + length);
+        const view = new DataView(arrayBuffer);
+        const channels = [];
+        let offset = 0;
+        let pos = 0;
+        
+        // Write WAV header
+        setUint32(0x46464952); // "RIFF"
+        setUint32(36 + length); // file length
+        setUint32(0x45564157); // "WAVE"
+        setUint32(0x20746d66); // "fmt " chunk
+        setUint32(16); // length = 16
+        setUint16(1); // PCM
+        setUint16(buffer.numberOfChannels);
+        setUint32(buffer.sampleRate);
+        setUint32(buffer.sampleRate * 2 * buffer.numberOfChannels); // byte rate
+        setUint16(buffer.numberOfChannels * 2); // block align
+        setUint16(16); // bits per sample
+        setUint32(0x61746164); // "data" chunk
+        setUint32(length);
+        
+        function setUint16(data) {
+            view.setUint16(pos, data, true);
+            pos += 2;
+        }
+        
+        function setUint32(data) {
+            view.setUint32(pos, data, true);
+            pos += 4;
+        }
+        
+        // Write interleaved data
+        for (let i = 0; i < buffer.numberOfChannels; i++) {
+            channels.push(buffer.getChannelData(i));
+        }
+        
+        while (offset < buffer.length) {
+            for (let i = 0; i < buffer.numberOfChannels; i++) {
+                let sample = Math.max(-1, Math.min(1, channels[i][offset]));
+                sample = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+                view.setInt16(pos, sample, true);
+                pos += 2;
+            }
+            offset++;
+        }
+        
+        return arrayBuffer;
+    }
+    
+    // Initialize AudioStorage on page load
+    AudioStorage.init().catch(err => console.warn('IndexedDB init failed:', err));
+    
+    console.log('✅ Audio compression and IndexedDB ready!');
+    
     // Call initFirebaseAuth when ready (outside try/catch so errors don't break Firebase)
     if (window.initFirebaseAuth) {
         try {
@@ -6681,6 +6853,14 @@ const firebaseConfig = {
                     <label class="form-label">Signification / Meaning</label>
                     <input type="text" class="form-input" id="edit-meaning-input">
                 </div>
+                
+                <div class="form-group">
+                    <label class="form-label">📝 Contexte (phrase d'origine)</label>
+                    <textarea class="form-textarea" id="edit-context-input" rows="2" placeholder="La phrase où tu as trouvé ce mot..." style="font-size: 0.95rem; font-style: italic; background: var(--whisper);"></textarea>
+                    <div style="font-size: 0.8rem; color: var(--text-soft); margin-top: 0.3rem;">
+                        💡 Auto-capturé depuis le transcript
+                    </div>
+                </div>
 
                 <div class="form-group">
                     <label class="form-label">Article (optionnel)</label>
@@ -8025,6 +8205,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
                     readingPassages,
                     presenceData,
                     mistakeCorrections: mistakeCorrections || [],
+                    transcriptWordStatus: window.transcriptWordStatus || {},
                     lastUpdated: new Date().toISOString()
                 });
                 
@@ -8078,6 +8259,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
                 localStorage.setItem('readingPassages', JSON.stringify(readingPassages));
                 localStorage.setItem('presenceData', JSON.stringify(presenceData));
                 localStorage.setItem('mistakeCorrections', JSON.stringify(mistakeCorrections || []));
+                localStorage.setItem('transcriptWordStatus', JSON.stringify(window.transcriptWordStatus || {}));
                 
                 console.log('✅ Data saved to localStorage successfully!');
                 
@@ -8115,6 +8297,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
                 const localPassages = localStorage.getItem('readingPassages');
                 const localPresence = localStorage.getItem('presenceData');
                 const localMistakes = localStorage.getItem('mistakeCorrections');
+                const localWordStatus = localStorage.getItem('transcriptWordStatus');
                 
                 if (localVocab) vocabulary = JSON.parse(localVocab);
                 if (localReadings) readingList = JSON.parse(localReadings);
@@ -8128,6 +8311,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
                 if (localPassages) readingPassages = JSON.parse(localPassages);
                 if (localPresence) presenceData = JSON.parse(localPresence);
                 if (localMistakes) mistakeCorrections = JSON.parse(localMistakes);
+                if (localWordStatus) window.transcriptWordStatus = JSON.parse(localWordStatus);
                 
                 console.log('✅ Loaded from localStorage:', {
                     vocabulary: vocabulary.length,
@@ -9933,6 +10117,12 @@ Ils seront préservés lors de l'affichage !"></textarea>
                     
                     <div class="word-french">${word.french}</div>
                     ${word.meaning ? `<div class="word-meaning">${word.meaning}</div>` : ''}
+                    ${word.context ? `
+                        <div style="margin-top: 0.75rem; padding: 0.75rem; background: var(--whisper); border-left: 3px solid var(--gold); border-radius: 6px;">
+                            <div style="font-size: 0.8rem; font-weight: 500; color: var(--text-soft); margin-bottom: 0.3rem;">📝 Contexte:</div>
+                            <div style="font-size: 0.95rem; font-style: italic; color: var(--text); line-height: 1.5;">"${word.context}"</div>
+                        </div>
+                    ` : ''}
                     ${word.article ? `<div class="word-article">${word.article}</div>` : ''}
                     
                     <div class="word-contexts">
@@ -10109,6 +10299,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
             document.getElementById('edit-word-id').value = id;
             document.getElementById('edit-word-input').value = word.french;
             document.getElementById('edit-meaning-input').value = word.meaning || '';
+            document.getElementById('edit-context-input').value = word.context || '';
             document.getElementById('edit-article-input').value = word.article || '';
             document.getElementById('edit-gender-input').value = word.gender || '';
             document.getElementById('edit-theme-input').value = word.theme || '';
@@ -10216,6 +10407,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
                 ...vocabulary[index],
                 french: document.getElementById('edit-word-input').value.trim(),
                 meaning: document.getElementById('edit-meaning-input').value.trim() || '',
+                context: document.getElementById('edit-context-input').value.trim() || '',
                 article: document.getElementById('edit-article-input').value,
                 gender: document.getElementById('edit-gender-input').value,
                 theme: document.getElementById('edit-theme-input').value.trim() || '',
@@ -12026,19 +12218,25 @@ Ils seront préservés lors de l'affichage !"></textarea>
                             audioChunks.push(event.data);
                         };
                         
-                        mediaRecorder.onstop = () => {
+                        mediaRecorder.onstop = async () => {
                             const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                            const reader = new FileReader();
-                            reader.readAsDataURL(audioBlob);
-                            reader.onloadend = () => {
-                                currentRecording = reader.result; // Base64 audio
-                                spokenText.innerHTML = `
-                                    <audio controls style="width: 100%; margin-top: 1rem;">
-                                        <source src="${reader.result}" type="audio/webm">
-                                    </audio>
-                                `;
-                                controls.style.display = 'flex';
-                            };
+                            
+                            // Compress audio before storing
+                            const compressedBlob = await compressAudio(audioBlob);
+                            
+                            // Create URL for preview
+                            const audioURL = URL.createObjectURL(compressedBlob);
+                            currentRecording = compressedBlob; // Store blob instead of base64!
+                            
+                            spokenText.innerHTML = `
+                                <audio controls style="width: 100%; margin-top: 1rem;">
+                                    <source src="${audioURL}" type="audio/wav">
+                                </audio>
+                                <p style="font-size: 0.85rem; color: var(--text); margin-top: 0.5rem;">
+                                    📊 Taille: ${(compressedBlob.size / 1024).toFixed(0)} KB (compressé)
+                                </p>
+                            `;
+                            controls.style.display = 'flex';
                             
                             // Stop all tracks
                             stream.getTracks().forEach(track => track.stop());
@@ -12073,24 +12271,37 @@ Ils seront préservés lors de l'affichage !"></textarea>
         }
 
         // Practice prompt selection
-        document.getElementById('save-recording').addEventListener('click', () => {
+        document.getElementById('save-recording').addEventListener('click', async () => {
             if (!currentRecording) {
                 alert('Enregistre d\'abord un audio');
                 return;
             }
 
             const question = document.getElementById('parler-question').value.trim();
+            const recordingId = Date.now();
 
+            // Save audio to IndexedDB (not in Firebase!)
+            try {
+                await AudioStorage.saveRecording(recordingId, currentRecording);
+                console.log('✅ Audio saved to IndexedDB');
+            } catch (error) {
+                console.error('❌ Failed to save audio to IndexedDB:', error);
+                alert('Erreur de sauvegarde audio');
+                return;
+            }
+
+            // Save metadata only (no audio data)
             const recording = {
-                id: Date.now(),
+                id: recordingId,
                 question: question || 'Sans question',
-                audioData: currentRecording, // Base64 audio
+                hasAudio: true, // Flag that audio is in IndexedDB
+                duration: 0, // Could calculate this if needed
                 note: document.getElementById('recording-note').value.trim() || '',
                 created: new Date().toISOString()
             };
 
             recordings.push(recording);
-                syncToFirebase(); // Auto-save recordings to Firebase
+            syncToFirebase(); // Only syncs metadata, not audio!
             
             // Log action for presence tracking
             logAction(ACTION_TYPES.SPEAKING);
@@ -12104,7 +12315,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
             currentRecording = null;
 
             renderRecordings();
-            alert('Sauvegardé ✓');
+            alert('✅ Enregistrement sauvegardé (IndexedDB)');
         });
 
         // Audio upload handler
@@ -12196,7 +12407,13 @@ Ils seront préservés lors de l'affichage !"></textarea>
                             </div>
                         </div>
                         ${rec.question ? `<div style="font-weight: 500; color: var(--crimson); margin-bottom: 0.75rem; font-size: 1rem;">Q: ${rec.question}</div>` : ''}
-                        ${rec.audioData ? `
+                        ${rec.hasAudio ? `
+                            <div id="audio-player-${rec.id}" style="margin: 1rem 0;">
+                                <button class="btn btn-secondary" onclick="loadAndPlayRecording(${rec.id})" style="width: 100%;">
+                                    ▶️ Écouter l'enregistrement
+                                </button>
+                            </div>
+                        ` : rec.audioData ? `
                             <audio controls style="width: 100%; margin: 1rem 0;">
                                 <source src="${rec.audioData}" type="audio/webm">
                             </audio>
@@ -12206,6 +12423,35 @@ Ils seront préservés lors de l'affichage !"></textarea>
                 `;
             }).join('');
         }
+        
+        // Load and play recording from IndexedDB
+        window.loadAndPlayRecording = async function(recordingId) {
+            const playerDiv = document.getElementById(`audio-player-${recordingId}`);
+            if (!playerDiv) return;
+            
+            try {
+                playerDiv.innerHTML = '<p style="text-align: center; color: var(--text);">⏳ Chargement...</p>';
+                
+                const result = await AudioStorage.getRecording(recordingId);
+                if (!result || !result.audioBlob) {
+                    playerDiv.innerHTML = '<p style="text-align: center; color: var(--crimson);">❌ Audio introuvable</p>';
+                    return;
+                }
+                
+                const audioURL = URL.createObjectURL(result.audioBlob);
+                playerDiv.innerHTML = `
+                    <audio controls style="width: 100%;" autoplay>
+                        <source src="${audioURL}" type="audio/wav">
+                    </audio>
+                    <p style="font-size: 0.85rem; color: var(--text); margin-top: 0.5rem; text-align: center;">
+                        📊 ${(result.audioBlob.size / 1024).toFixed(0)} KB
+                    </p>
+                `;
+            } catch (error) {
+                console.error('Error loading recording:', error);
+                playerDiv.innerHTML = '<p style="text-align: center; color: var(--crimson);">❌ Erreur de chargement</p>';
+            }
+        };
 
         function editRecording(id) {
             const rec = recordings.find(r => r.id === id);
@@ -12237,8 +12483,19 @@ Ils seront préservés lors de l'affichage !"></textarea>
             closeModal('edit-recording-modal');
         });
 
-        function deleteRecording(id) {
+        async function deleteRecording(id) {
             if (confirm('Supprimer cet enregistrement ?')) {
+                // Delete from IndexedDB if audio exists there
+                const rec = recordings.find(r => r.id === id);
+                if (rec && rec.hasAudio) {
+                    try {
+                        await AudioStorage.deleteRecording(id);
+                        console.log('✅ Audio deleted from IndexedDB');
+                    } catch (error) {
+                        console.error('Error deleting from IndexedDB:', error);
+                    }
+                }
+                
                 recordings = recordings.filter(r => r.id !== id);
                 syncToFirebase(); // Auto-save recordings to Firebase
                 renderRecordings();
@@ -14724,6 +14981,11 @@ Ils seront préservés lors de l'affichage !"></textarea>
                         console.log('✅ Loaded', mistakeCorrections.length, 'mistake corrections');
                     }
                     
+                    if (data.transcriptWordStatus) {
+                        window.transcriptWordStatus = data.transcriptWordStatus;
+                        console.log('✅ Loaded', Object.keys(window.transcriptWordStatus).length, 'word statuses');
+                    }
+                    
                     // CRITICAL: Rebuild presence data from ALL existing entries
                     // This ensures calendar shows entries that were created before presence tracking was added
                     rebuildPresenceDataFromEntries();
@@ -15872,6 +16134,10 @@ Ils seront préservés lors de l'affichage !"></textarea>
             }
         }
 
+        // Track if user has manually scrolled the transcript
+        let userHasScrolled = false;
+        let scrollTimeout = null;
+
         function highlightCurrentLine(currentTime) {
             const lines = document.querySelectorAll('.transcript-line');
             let activeIndex = -1;
@@ -15895,11 +16161,38 @@ Ils seront préservés lors de l'affichage !"></textarea>
                 }
             });
             
-            // Auto-scroll to active line
-            if (activeIndex >= 0 && lines[activeIndex]) {
+            // Auto-scroll to active line ONLY if user hasn't manually scrolled
+            if (activeIndex >= 0 && lines[activeIndex] && !userHasScrolled) {
                 lines[activeIndex].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }
         }
+        
+        // Detect when user manually scrolls or touches the transcript
+        document.addEventListener('DOMContentLoaded', function() {
+            const transcriptContainer = document.querySelector('.clickable-transcript, #transcript-div');
+            if (transcriptContainer) {
+                // Reset userHasScrolled when audio starts playing
+                const resetScroll = () => {
+                    userHasScrolled = false;
+                };
+                
+                // Detect manual scrolling
+                transcriptContainer.addEventListener('touchstart', () => {
+                    userHasScrolled = true;
+                    clearTimeout(scrollTimeout);
+                    // Re-enable auto-scroll after 3 seconds of no interaction
+                    scrollTimeout = setTimeout(resetScroll, 3000);
+                });
+                
+                transcriptContainer.addEventListener('scroll', (e) => {
+                    // Only mark as user scroll if it's not from our auto-scroll
+                    if (!e.isTrusted) return;
+                    userHasScrolled = true;
+                    clearTimeout(scrollTimeout);
+                    scrollTimeout = setTimeout(resetScroll, 3000);
+                }, { passive: true });
+            }
+        });
 
     </script>
 
@@ -16234,6 +16527,14 @@ Ils seront préservés lors de l'affichage !"></textarea>
             <textarea class="form-textarea" id="word-analysis-meaning" placeholder="Écris ce que ce mot signifie pour toi..." rows="3"></textarea>
         </div>
         
+        <div class="form-group">
+            <label class="form-label">📝 Contexte (optionnel)</label>
+            <textarea class="form-textarea" id="word-analysis-context" placeholder="La phrase où tu as trouvé ce mot..." rows="2" style="font-size: 0.95rem; font-style: italic; background: var(--whisper);"></textarea>
+            <div style="font-size: 0.8rem; color: var(--text-soft); margin-top: 0.3rem;">
+                💡 Le contexte t'aide à te souvenir comment ce mot est utilisé!
+            </div>
+        </div>
+        
         <div style="margin: 1rem 0; padding: 1rem; background: var(--whisper); border-radius: 8px;">
             <div style="font-size: 0.9rem; font-weight: 500; margin-bottom: 0.5rem; color: var(--text-soft);">📚 Dictionnaires:</div>
             <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
@@ -16434,8 +16735,8 @@ Ils seront préservés lors de l'affichage !"></textarea>
                 }
                 updateToolbar();
             } else {
-                // Single word analysis (original behavior)
-                openWordAnalysisPopup(word, original);
+                // Single word analysis (original behavior) - PASS ELEMENT FOR CONTEXT
+                openWordAnalysisPopup(word, original, element);
             }
         }
         
@@ -16457,7 +16758,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
             openWordAnalysisPopup(words[0], wordText);
         }
         
-        function openWordAnalysisPopup(word, original) {
+        function openWordAnalysisPopup(word, original, contextElement) {
             currentAnalyzingWord = word;
             currentAnalyzingOriginal = original;
             
@@ -16465,6 +16766,24 @@ Ils seront préservés lors de l'affichage !"></textarea>
             document.getElementById('word-analysis-popup').style.display = 'block';
             document.getElementById('word-analysis-word').value = original;
             document.getElementById('word-analysis-meaning').value = '';
+            
+            // AUTO-CAPTURE CONTEXT from transcript!
+            let capturedContext = '';
+            if (contextElement) {
+                // Find the parent transcript line
+                const transcriptLine = contextElement.closest('.transcript-line');
+                if (transcriptLine) {
+                    capturedContext = transcriptLine.textContent.trim();
+                } else {
+                    // Fallback: try to get surrounding text
+                    const parent = contextElement.parentElement;
+                    if (parent) {
+                        capturedContext = parent.textContent.trim();
+                    }
+                }
+            }
+            
+            document.getElementById('word-analysis-context').value = capturedContext;
             document.getElementById('word-analysis-meaning').focus();
             
             // Update dictionary links
@@ -16478,6 +16797,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
         function closeWordAnalysisPopup() {
             document.getElementById('word-analysis-overlay').style.display = 'none';
             document.getElementById('word-analysis-popup').style.display = 'none';
+            document.getElementById('word-analysis-context').value = ''; // Clear context
             currentAnalyzingWord = null;
             currentAnalyzingOriginal = null;
             window._batchSelectedWords = null;
@@ -16506,6 +16826,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
             });
             
             const count = batchWords.length;
+            syncToFirebase(); // Save word status immediately
             alert(`✅ ${count} mot${count > 1 ? 's' : ''} marqué${count > 1 ? 's' : ''} comme inconnu${count > 1 ? 's' : ''} (orange)`);
             closeWordAnalysisPopup();
         }
@@ -16524,11 +16845,15 @@ Ils seront préservés lors de l'affichage !"></textarea>
             // Check if this is a batch operation
             const batchWords = window._batchSelectedWords || [currentAnalyzingWord];
             
+            // Get the context from the form
+            const context = document.getElementById('word-analysis-context').value.trim();
+            
             // Add to vocabulary (Le Jardin)
             const newWord = {
                 id: Date.now(),
                 word: wordText,
                 meaning: meaning,
+                context: context || '', // Save the context!
                 article: '',
                 gender: '',
                 theme: 'transcription',
