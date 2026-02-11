@@ -342,13 +342,12 @@ const FirebaseREST = {
 console.log('✅ Firebase REST ready!');
 
 const firebaseConfig = {
-    apiKey: "AIzaSyD5l89evtb8svRKoTVICAVwA4JbpoXjJKQ",
-    authDomain: "ma-maison-french.firebaseapp.com",
-    projectId: "ma-maison-french",
-    storageBucket: "ma-maison-french.firebasestorage.app",
-    messagingSenderId: "319573050083",
-    appId: "1:319573050083:web:11ff8453f39cce3160fbd6",
-    measurementId: "G-JP9BNPQX0B"
+    apiKey: "AIzaSyBMb0vvGcCqEQREhUeNr6odUn0xPbSA96A",
+    authDomain: "ma-maison-app-9ff93.firebaseapp.com",
+    projectId: "ma-maison-app-9ff93",
+    storageBucket: "ma-maison-app-9ff93.firebasestorage.app",
+    messagingSenderId: "874510508050",
+    appId: "1:874510508050:web:7ee47a413e49caba4238cb"
 };
 
 // Initialize Firebase (must be async now)
@@ -399,6 +398,178 @@ const firebaseConfig = {
         console.error('❌ Firebase initialization failed:', error);
         alert('Firebase initialization failed. Check console for details.');
     }
+    
+    // ============================================
+    // INDEXEDDB FOR AUDIO RECORDINGS
+    // ============================================
+    const AudioStorage = {
+        dbName: 'MaMaisonAudio',
+        storeName: 'recordings',
+        db: null,
+        
+        async init() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(this.dbName, 1);
+                
+                request.onerror = () => reject(request.error);
+                request.onsuccess = () => {
+                    this.db = request.result;
+                    console.log('✅ IndexedDB for audio initialized');
+                    resolve(this.db);
+                };
+                
+                request.onupgradeneeded = (event) => {
+                    const db = event.target.result;
+                    if (!db.objectStoreNames.contains(this.storeName)) {
+                        db.createObjectStore(this.storeName, { keyPath: 'id' });
+                        console.log('✅ IndexedDB object store created');
+                    }
+                };
+            });
+        },
+        
+        async saveRecording(id, audioBlob) {
+            if (!this.db) await this.init();
+            
+            return new Promise((resolve, reject) => {
+                const transaction = this.db.transaction([this.storeName], 'readwrite');
+                const store = transaction.objectStore(this.storeName);
+                const request = store.put({ id, audioBlob, timestamp: Date.now() });
+                
+                request.onsuccess = () => {
+                    console.log('✅ Audio saved to IndexedDB:', id);
+                    resolve();
+                };
+                request.onerror = () => reject(request.error);
+            });
+        },
+        
+        async getRecording(id) {
+            if (!this.db) await this.init();
+            
+            return new Promise((resolve, reject) => {
+                const transaction = this.db.transaction([this.storeName], 'readonly');
+                const store = transaction.objectStore(this.storeName);
+                const request = store.get(id);
+                
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        },
+        
+        async deleteRecording(id) {
+            if (!this.db) await this.init();
+            
+            return new Promise((resolve, reject) => {
+                const transaction = this.db.transaction([this.storeName], 'readwrite');
+                const store = transaction.objectStore(this.storeName);
+                const request = store.delete(id);
+                
+                request.onsuccess = () => resolve();
+                request.onerror = () => reject(request.error);
+            });
+        }
+    };
+    
+    // ============================================
+    // AUDIO COMPRESSION
+    // ============================================
+    async function compressAudio(audioBlob) {
+        try {
+            console.log('🔊 Original audio size:', (audioBlob.size / 1024 / 1024).toFixed(2), 'MB');
+            
+            // Create audio context
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const arrayBuffer = await audioBlob.arrayBuffer();
+            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+            
+            // Create offline context with lower sample rate (compress!)
+            const sampleRate = 22050; // Down from 48000 - saves ~50% space
+            const offlineContext = new OfflineAudioContext(
+                1, // mono instead of stereo - saves 50% space
+                audioBuffer.duration * sampleRate,
+                sampleRate
+            );
+            
+            // Create buffer source
+            const source = offlineContext.createBufferSource();
+            source.buffer = audioBuffer;
+            source.connect(offlineContext.destination);
+            source.start();
+            
+            // Render compressed audio
+            const compressedBuffer = await offlineContext.startRendering();
+            
+            // Convert back to blob with lower bitrate
+            const wav = audioBufferToWav(compressedBuffer);
+            const compressedBlob = new Blob([wav], { type: 'audio/wav' });
+            
+            console.log('✅ Compressed audio size:', (compressedBlob.size / 1024 / 1024).toFixed(2), 'MB');
+            console.log('📊 Compression ratio:', ((1 - compressedBlob.size / audioBlob.size) * 100).toFixed(1) + '% smaller');
+            
+            return compressedBlob;
+        } catch (error) {
+            console.warn('⚠️ Audio compression failed, using original:', error);
+            return audioBlob;
+        }
+    }
+    
+    // Convert AudioBuffer to WAV format
+    function audioBufferToWav(buffer) {
+        const length = buffer.length * buffer.numberOfChannels * 2;
+        const arrayBuffer = new ArrayBuffer(44 + length);
+        const view = new DataView(arrayBuffer);
+        const channels = [];
+        let offset = 0;
+        let pos = 0;
+        
+        // Write WAV header
+        setUint32(0x46464952); // "RIFF"
+        setUint32(36 + length); // file length
+        setUint32(0x45564157); // "WAVE"
+        setUint32(0x20746d66); // "fmt " chunk
+        setUint32(16); // length = 16
+        setUint16(1); // PCM
+        setUint16(buffer.numberOfChannels);
+        setUint32(buffer.sampleRate);
+        setUint32(buffer.sampleRate * 2 * buffer.numberOfChannels); // byte rate
+        setUint16(buffer.numberOfChannels * 2); // block align
+        setUint16(16); // bits per sample
+        setUint32(0x61746164); // "data" chunk
+        setUint32(length);
+        
+        function setUint16(data) {
+            view.setUint16(pos, data, true);
+            pos += 2;
+        }
+        
+        function setUint32(data) {
+            view.setUint32(pos, data, true);
+            pos += 4;
+        }
+        
+        // Write interleaved data
+        for (let i = 0; i < buffer.numberOfChannels; i++) {
+            channels.push(buffer.getChannelData(i));
+        }
+        
+        while (offset < buffer.length) {
+            for (let i = 0; i < buffer.numberOfChannels; i++) {
+                let sample = Math.max(-1, Math.min(1, channels[i][offset]));
+                sample = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+                view.setInt16(pos, sample, true);
+                pos += 2;
+            }
+            offset++;
+        }
+        
+        return arrayBuffer;
+    }
+    
+    // Initialize AudioStorage on page load
+    AudioStorage.init().catch(err => console.warn('IndexedDB init failed:', err));
+    
+    console.log('✅ Audio compression and IndexedDB ready!');
     
     // Call initFirebaseAuth when ready (outside try/catch so errors don't break Firebase)
     if (window.initFirebaseAuth) {
@@ -6217,7 +6388,10 @@ const firebaseConfig = {
                     </button>
                 </div>
 
-                <div style="text-align: center;">
+                <div style="text-align: center; display: flex; gap: 1rem; justify-content: center; align-items: center;">
+                    <button class="btn btn-secondary" onclick="forceRefreshListeningList()" title="Actualiser les données">
+                        🔄 Actualiser
+                    </button>
                     <button class="btn btn-primary" id="add-listening-btn">Ajouter du contenu</button>
                 </div>
             </div>
@@ -6681,6 +6855,14 @@ const firebaseConfig = {
                 <div class="form-group">
                     <label class="form-label">Signification / Meaning</label>
                     <input type="text" class="form-input" id="edit-meaning-input">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">📝 Contexte (phrase d'origine)</label>
+                    <textarea class="form-textarea" id="edit-context-input" rows="2" placeholder="La phrase où tu as trouvé ce mot..." style="font-size: 0.95rem; font-style: italic; background: var(--whisper);"></textarea>
+                    <div style="font-size: 0.8rem; color: var(--text-soft); margin-top: 0.3rem;">
+                        💡 Auto-capturé depuis le transcript
+                    </div>
                 </div>
 
                 <div class="form-group">
@@ -8026,6 +8208,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
                     readingPassages,
                     presenceData,
                     mistakeCorrections: mistakeCorrections || [],
+                    transcriptWordStatus: window.transcriptWordStatus || {},
                     lastUpdated: new Date().toISOString()
                 });
                 
@@ -8079,6 +8262,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
                 localStorage.setItem('readingPassages', JSON.stringify(readingPassages));
                 localStorage.setItem('presenceData', JSON.stringify(presenceData));
                 localStorage.setItem('mistakeCorrections', JSON.stringify(mistakeCorrections || []));
+                localStorage.setItem('transcriptWordStatus', JSON.stringify(window.transcriptWordStatus || {}));
                 
                 console.log('✅ Data saved to localStorage successfully!');
                 
@@ -8116,6 +8300,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
                 const localPassages = localStorage.getItem('readingPassages');
                 const localPresence = localStorage.getItem('presenceData');
                 const localMistakes = localStorage.getItem('mistakeCorrections');
+                const localWordStatus = localStorage.getItem('transcriptWordStatus');
                 
                 if (localVocab) vocabulary = JSON.parse(localVocab);
                 if (localReadings) readingList = JSON.parse(localReadings);
@@ -8129,6 +8314,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
                 if (localPassages) readingPassages = JSON.parse(localPassages);
                 if (localPresence) presenceData = JSON.parse(localPresence);
                 if (localMistakes) mistakeCorrections = JSON.parse(localMistakes);
+                if (localWordStatus) window.transcriptWordStatus = JSON.parse(localWordStatus);
                 
                 console.log('✅ Loaded from localStorage:', {
                     vocabulary: vocabulary.length,
@@ -8274,7 +8460,16 @@ Ils seront préservés lors de l'affichage !"></textarea>
             
             if (localVocab) vocabulary = JSON.parse(localVocab);
             if (localReadings) readingList = JSON.parse(localReadings);
-            if (localListening) listeningList = JSON.parse(localListening);
+            if (localListening) {
+                listeningList = JSON.parse(localListening);
+                // 🧹 ONE-TIME CLEANUP: Remove any orphaned items that cause errors
+                const beforeCount = listeningList.length;
+                listeningList = listeningList.filter(item => item && item.id && item.title);
+                if (beforeCount !== listeningList.length) {
+                    console.log(`🧹 Cleaned up ${beforeCount - listeningList.length} invalid items`);
+                    localStorage.setItem('listeningList', JSON.stringify(listeningList));
+                }
+            }
             if (localRecordings) recordings = JSON.parse(localRecordings);
             if (localWritings) writings = JSON.parse(localWritings);
             if (localNotes) notes = JSON.parse(localNotes);
@@ -9934,6 +10129,12 @@ Ils seront préservés lors de l'affichage !"></textarea>
                     
                     <div class="word-french">${word.french}</div>
                     ${word.meaning ? `<div class="word-meaning">${word.meaning}</div>` : ''}
+                    ${word.context ? `
+                        <div style="margin-top: 0.75rem; padding: 0.75rem; background: var(--whisper); border-left: 3px solid var(--gold); border-radius: 6px;">
+                            <div style="font-size: 0.8rem; font-weight: 500; color: var(--text-soft); margin-bottom: 0.3rem;">📝 Contexte:</div>
+                            <div style="font-size: 0.95rem; font-style: italic; color: var(--text); line-height: 1.5;">"${word.context}"</div>
+                        </div>
+                    ` : ''}
                     ${word.article ? `<div class="word-article">${word.article}</div>` : ''}
                     
                     <div class="word-contexts">
@@ -10104,12 +10305,18 @@ Ils seront préservés lors de l'affichage !"></textarea>
         }
 
         function editWord(id) {
-            const word = vocabulary.find(w => w.id === id);
-            if (!word) return;
+            const numericId = Number(id);
+            const word = vocabulary.find(w => Number(w.id) === numericId);
+            if (!word) {
+                console.error('❌ Word not found! ID:', numericId);
+                alert(`❌ ERROR: Word not found! ID: ${numericId}`);
+                return;
+            }
 
-            document.getElementById('edit-word-id').value = id;
+            document.getElementById('edit-word-id').value = numericId;
             document.getElementById('edit-word-input').value = word.french;
             document.getElementById('edit-meaning-input').value = word.meaning || '';
+            document.getElementById('edit-context-input').value = word.context || '';
             document.getElementById('edit-article-input').value = word.article || '';
             document.getElementById('edit-gender-input').value = word.gender || '';
             document.getElementById('edit-theme-input').value = word.theme || '';
@@ -10132,7 +10339,8 @@ Ils seront préservés lors de l'affichage !"></textarea>
 
         function deleteWord(id) {
             if (confirm('Supprimer ce mot ?')) {
-                vocabulary = vocabulary.filter(w => w.id !== id);
+                const numericId = Number(id);
+                vocabulary = vocabulary.filter(w => Number(w.id) !== numericId);
                 if (window.syncToFirebase) window.syncToFirebase();
                 
                 renderGarden();
@@ -10206,17 +10414,25 @@ Ils seront préservés lors de l'affichage !"></textarea>
         document.getElementById('edit-word-form').addEventListener('submit', (e) => {
             e.preventDefault();
             
-            const id = parseInt(document.getElementById('edit-word-id').value);
-            const index = vocabulary.findIndex(w => w.id === id);
+            const id = Number(document.getElementById('edit-word-id').value);
+            console.log('💾 Saving word edit for ID:', id, 'Type:', typeof id);
             
-            if (index === -1) return;
+            const index = vocabulary.findIndex(w => Number(w.id) === id);
+            
+            if (index === -1) {
+                console.error('❌ Could not find word with ID:', id);
+                alert(`❌ ERROR: Word not found! ID: ${id}`);
+                return;
+            }
 
             const imagePreview = document.getElementById('edit-word-image-preview');
 
             vocabulary[index] = {
                 ...vocabulary[index],
+                id: id, // Ensure ID stays as number
                 french: document.getElementById('edit-word-input').value.trim(),
                 meaning: document.getElementById('edit-meaning-input').value.trim() || '',
+                context: document.getElementById('edit-context-input').value.trim() || '',
                 article: document.getElementById('edit-article-input').value,
                 gender: document.getElementById('edit-gender-input').value,
                 theme: document.getElementById('edit-theme-input').value.trim() || '',
@@ -10237,6 +10453,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
                 alert('Veuillez entrer un mot en français');
                 return;
             }            if (window.syncToFirebase) window.syncToFirebase();
+            console.log('✅ Word saved successfully:', vocabulary[index]);
             
             renderGarden();
             populateJardinFilters(); // Update filters after editing
@@ -10792,10 +11009,15 @@ Ils seront préservés lors de l'affichage !"></textarea>
         }
 
         function editReading(id) {
-            const item = readingList.find(r => r.id === id);
-            if (!item) return;
+            const numericId = Number(id);
+            const item = readingList.find(r => Number(r.id) === numericId);
+            if (!item) {
+                console.error('❌ Reading item not found! ID:', numericId);
+                alert(`❌ ERROR: Reading item not found! ID: ${numericId}`);
+                return;
+            }
 
-            document.getElementById('edit-reading-id').value = id;
+            document.getElementById('edit-reading-id').value = numericId;
             document.getElementById('edit-reading-type').value = item.type;
             document.getElementById('edit-reading-title').value = item.title;
             document.getElementById('edit-reading-link').value = item.link || '';
@@ -10811,7 +11033,8 @@ Ils seront préservés lors de l'affichage !"></textarea>
 
         function deleteReading(id) {
             if (confirm('Supprimer cet article ?')) {
-                readingList = readingList.filter(r => r.id !== id);
+                const numericId = Number(id);
+                readingList = readingList.filter(r => Number(r.id) !== numericId);
                 syncToFirebase(); // Auto-save readingList to Firebase
                 renderReadingList();
             }
@@ -10868,21 +11091,28 @@ Ils seront préservés lors de l'affichage !"></textarea>
         document.getElementById('edit-reading-form').addEventListener('submit', (e) => {
             e.preventDefault();
             
-            const id = parseInt(document.getElementById('edit-reading-id').value);
-            const index = readingList.findIndex(r => r.id === id);
+            const id = Number(document.getElementById('edit-reading-id').value);
+            console.log('💾 Saving reading edit for ID:', id, 'Type:', typeof id);
             
-            if (index === -1) return;
+            const index = readingList.findIndex(r => Number(r.id) === id);
+            
+            if (index === -1) {
+                console.error('❌ Could not find reading item with ID:', id);
+                alert(`❌ ERROR: Reading item not found! ID: ${id}`);
+                return;
+            }
 
             const linkedPassageId = document.getElementById('edit-reading-linked-passage').value;
 
             readingList[index] = {
                 ...readingList[index],
+                id: id, // Ensure ID stays as number
                 type: document.getElementById('edit-reading-type').value,
                 title: document.getElementById('edit-reading-title').value.trim(),
                 link: document.getElementById('edit-reading-link').value.trim(),
                 status: document.getElementById('edit-reading-status').value,
                 note: document.getElementById('edit-reading-note').value.trim() || '',
-                linkedPassageId: linkedPassageId ? parseInt(linkedPassageId) : null
+                linkedPassageId: linkedPassageId ? Number(linkedPassageId) : null
             };
 
             // Validate required field
@@ -10890,6 +11120,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
                 alert('Veuillez entrer un titre');
                 return;
             }            syncToFirebase(); // Auto-save readingList to Firebase
+            console.log('✅ Reading item saved successfully:', readingList[index]);
             renderReadingList();
             closeModal('edit-reading-modal');
         });
@@ -10914,6 +11145,46 @@ Ils seront préservés lors de l'affichage !"></textarea>
             renderListeningList();
         };
 
+        // Manual refresh function - sync from Firebase and re-render
+        async function forceRefreshListeningList() {
+            console.log('🔄 Manual refresh triggered');
+            
+            // Show loading feedback
+            const grid = document.getElementById('listening-grid');
+            if (grid) {
+                grid.innerHTML = '<div style="text-align:center; padding:40px; color:#8b4654;">🔄 Actualisation...</div>';
+            }
+            
+            try {
+                // Sync from Firebase
+                await syncFromFirebase();
+                console.log('✅ Data refreshed from Firebase');
+                
+                // Re-render the list
+                renderListeningList();
+                
+                // Show success feedback
+                alert('✅ Données actualisées!');
+            } catch (error) {
+                console.error('❌ Refresh failed:', error);
+                
+                // Try localStorage as backup
+                try {
+                    const freshData = localStorage.getItem('listeningList');
+                    if (freshData) {
+                        listeningList = JSON.parse(freshData);
+                        renderListeningList();
+                        alert('✅ Données chargées depuis le cache local');
+                    } else {
+                        alert('❌ Échec de l\'actualisation. Vérifiez votre connexion.');
+                    }
+                } catch (e) {
+                    alert('❌ Erreur lors du chargement des données');
+                    renderListeningList();
+                }
+            }
+        }
+
         function renderListeningList() {
             const grid = document.getElementById('listening-grid');
             
@@ -10925,7 +11196,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
             
             if (filteredList.length === 0) {
                 const emptyMessage = currentListeningCategory === 'all' 
-                    ? 'Rien ici encore...' 
+                    ? 'Rien ici encore... Clique sur "Ajouter du contenu" pour commencer!' 
                     : 'Aucun contenu dans cette catégorie';
                     
                 grid.innerHTML = `
@@ -11007,11 +11278,47 @@ Ils seront préservés lors de l'affichage !"></textarea>
             `).join('');
         }
 
-        function editListening(id) {
-            const item = listeningList.find(l => l.id === id);
-            if (!item) return;
+        async function editListening(id) {
+            console.log('✏️ Editing item:', id, 'Type:', typeof id);
+            
+            // First, try to sync from Firebase to get latest data
+            try {
+                await syncFromFirebase();
+                console.log('✅ Synced from Firebase before edit');
+            } catch (e) {
+                console.warn('⚠️ Firebase sync failed, using local data:', e);
+            }
+            
+            // Ensure ID is a number for comparison
+            const numericId = Number(id);
+            const item = listeningList.find(l => Number(l.id) === numericId);
+            if (!item) {
+                console.error('❌ Item not found after sync!', numericId);
+                console.log('📋 Available IDs:', listeningList.map(l => ({ id: l.id, type: typeof l.id })));
+                
+                // Try one more time with localStorage
+                try {
+                    const freshData = localStorage.getItem('listeningList');
+                    if (freshData) {
+                        listeningList = JSON.parse(freshData);
+                        const retryItem = listeningList.find(l => Number(l.id) === numericId);
+                        if (retryItem) {
+                            console.log('✅ Found item in localStorage');
+                            renderListeningList();
+                            // Try again with the found item
+                            setTimeout(() => editListening(numericId), 100);
+                            return;
+                        }
+                    }
+                } catch (e) {
+                    console.error('Failed to reload:', e);
+                }
+                
+                alert(`❌ ERROR: Item not found! ID: ${numericId}`);
+                return;
+            }
 
-            document.getElementById('edit-listening-id').value = id;
+            document.getElementById('edit-listening-id').value = numericId;
             document.getElementById('edit-listening-type').value = item.type;
             document.getElementById('edit-listening-title').value = item.title;
             document.getElementById('edit-listening-media-url').value = item.mediaUrl || '';
@@ -11024,7 +11331,8 @@ Ils seront préservés lors de l'affichage !"></textarea>
 
         function deleteListening(id) {
             if (confirm('Supprimer ce média ?')) {
-                listeningList = listeningList.filter(l => l.id !== id);
+                const numericId = Number(id);
+                listeningList = listeningList.filter(l => Number(l.id) !== numericId);
                 syncToFirebase(); // Auto-save listeningList to Firebase
                 renderListeningList();
             }
@@ -11083,16 +11391,24 @@ Ils seront préservés lors de l'affichage !"></textarea>
         document.getElementById('edit-listening-form').addEventListener('submit', (e) => {
             e.preventDefault();
             
-            const id = parseInt(document.getElementById('edit-listening-id').value);
-            const index = listeningList.findIndex(l => l.id === id);
+            const id = Number(document.getElementById('edit-listening-id').value);
+            console.log('💾 Saving edit for ID:', id, 'Type:', typeof id);
+            console.log('📋 Current listeningList IDs:', listeningList.map(l => ({ id: l.id, type: typeof l.id })));
             
-            if (index === -1) return;
+            const index = listeningList.findIndex(l => Number(l.id) === id);
+            
+            if (index === -1) {
+                console.error('❌ Could not find item with ID:', id);
+                alert(`❌ ERROR: Item not found! ID: ${id}`);
+                return;
+            }
 
             const transcriptText = document.getElementById('edit-listening-transcript-text').value.trim();
             const parsedTranscript = transcriptText ? parseTranscript(transcriptText) : null;
 
             listeningList[index] = {
                 ...listeningList[index],
+                id: id, // Ensure ID stays as number
                 type: document.getElementById('edit-listening-type').value,
                 title: document.getElementById('edit-listening-title').value.trim(),
                 mediaUrl: document.getElementById('edit-listening-media-url').value.trim(),
@@ -11107,6 +11423,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
                 alert('Veuillez entrer un titre');
                 return;
             }            syncToFirebase(); // Auto-save listeningList to Firebase
+            console.log('✅ Item saved successfully:', listeningList[index]);
             renderListeningList();
             closeModal('edit-listening-modal');
         });
@@ -11256,10 +11573,15 @@ Ils seront préservés lors de l'affichage !"></textarea>
         }
 
         function editResource(id) {
-            const item = resourcesList.find(r => r.id === id);
-            if (!item) return;
+            const numericId = Number(id);
+            const item = resourcesList.find(r => Number(r.id) === numericId);
+            if (!item) {
+                console.error('❌ Resource not found! ID:', numericId);
+                alert(`❌ ERROR: Resource not found! ID: ${numericId}`);
+                return;
+            }
 
-            document.getElementById('edit-resources-id').value = id;
+            document.getElementById('edit-resources-id').value = numericId;
             document.getElementById('edit-resources-type').value = item.type;
             document.getElementById('edit-resources-name').value = item.name;
             document.getElementById('edit-resources-description').value = item.description || '';
@@ -11277,7 +11599,8 @@ Ils seront préservés lors de l'affichage !"></textarea>
 
         function deleteResource(id) {
             if (confirm('Supprimer cette ressource ?')) {
-                resourcesList = resourcesList.filter(r => r.id !== id);
+                const numericId = Number(id);
+                resourcesList = resourcesList.filter(r => Number(r.id) !== numericId);
                 syncToFirebase(); // Auto-save resourcesList to Firebase
                 renderResourcesList();
                 renderSectionResources(); // Update section resources
@@ -11343,10 +11666,16 @@ Ils seront préservés lors de l'affichage !"></textarea>
         document.getElementById('edit-resources-form').addEventListener('submit', (e) => {
             e.preventDefault();
             
-            const id = parseInt(document.getElementById('edit-resources-id').value);
-            const index = resourcesList.findIndex(r => r.id === id);
+            const id = Number(document.getElementById('edit-resources-id').value);
+            console.log('💾 Saving resource edit for ID:', id, 'Type:', typeof id);
             
-            if (index === -1) return;
+            const index = resourcesList.findIndex(r => Number(r.id) === id);
+            
+            if (index === -1) {
+                console.error('❌ Could not find resource with ID:', id);
+                alert(`❌ ERROR: Resource not found! ID: ${id}`);
+                return;
+            }
 
             // Get selected sections
             const selectedSections = Array.from(document.querySelectorAll('.edit-resources-section-checkbox:checked'))
@@ -11354,6 +11683,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
 
             resourcesList[index] = {
                 ...resourcesList[index],
+                id: id, // Ensure ID stays as number
                 type: document.getElementById('edit-resources-type').value,
                 name: document.getElementById('edit-resources-name').value.trim(),
                 description: document.getElementById('edit-resources-description').value.trim() || '',
@@ -11367,6 +11697,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
                 alert('Veuillez entrer un nom');
                 return;
             }            syncToFirebase(); // Auto-save resourcesList to Firebase
+            console.log('✅ Resource saved successfully:', resourcesList[index]);
             renderResourcesList();
             renderSectionResources(); // Render resources in sections
             closeModal('edit-resources-modal');
@@ -12027,19 +12358,25 @@ Ils seront préservés lors de l'affichage !"></textarea>
                             audioChunks.push(event.data);
                         };
                         
-                        mediaRecorder.onstop = () => {
+                        mediaRecorder.onstop = async () => {
                             const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                            const reader = new FileReader();
-                            reader.readAsDataURL(audioBlob);
-                            reader.onloadend = () => {
-                                currentRecording = reader.result; // Base64 audio
-                                spokenText.innerHTML = `
-                                    <audio controls style="width: 100%; margin-top: 1rem;">
-                                        <source src="${reader.result}" type="audio/webm">
-                                    </audio>
-                                `;
-                                controls.style.display = 'flex';
-                            };
+                            
+                            // Compress audio before storing
+                            const compressedBlob = await compressAudio(audioBlob);
+                            
+                            // Create URL for preview
+                            const audioURL = URL.createObjectURL(compressedBlob);
+                            currentRecording = compressedBlob; // Store blob instead of base64!
+                            
+                            spokenText.innerHTML = `
+                                <audio controls style="width: 100%; margin-top: 1rem;">
+                                    <source src="${audioURL}" type="audio/wav">
+                                </audio>
+                                <p style="font-size: 0.85rem; color: var(--text); margin-top: 0.5rem;">
+                                    📊 Taille: ${(compressedBlob.size / 1024).toFixed(0)} KB (compressé)
+                                </p>
+                            `;
+                            controls.style.display = 'flex';
                             
                             // Stop all tracks
                             stream.getTracks().forEach(track => track.stop());
@@ -12074,24 +12411,37 @@ Ils seront préservés lors de l'affichage !"></textarea>
         }
 
         // Practice prompt selection
-        document.getElementById('save-recording').addEventListener('click', () => {
+        document.getElementById('save-recording').addEventListener('click', async () => {
             if (!currentRecording) {
                 alert('Enregistre d\'abord un audio');
                 return;
             }
 
             const question = document.getElementById('parler-question').value.trim();
+            const recordingId = Date.now();
 
+            // Save audio to IndexedDB (not in Firebase!)
+            try {
+                await AudioStorage.saveRecording(recordingId, currentRecording);
+                console.log('✅ Audio saved to IndexedDB');
+            } catch (error) {
+                console.error('❌ Failed to save audio to IndexedDB:', error);
+                alert('Erreur de sauvegarde audio');
+                return;
+            }
+
+            // Save metadata only (no audio data)
             const recording = {
-                id: Date.now(),
+                id: recordingId,
                 question: question || 'Sans question',
-                audioData: currentRecording, // Base64 audio
+                hasAudio: true, // Flag that audio is in IndexedDB
+                duration: 0, // Could calculate this if needed
                 note: document.getElementById('recording-note').value.trim() || '',
                 created: new Date().toISOString()
             };
 
             recordings.push(recording);
-                syncToFirebase(); // Auto-save recordings to Firebase
+            syncToFirebase(); // Only syncs metadata, not audio!
             
             // Log action for presence tracking
             logAction(ACTION_TYPES.SPEAKING);
@@ -12105,7 +12455,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
             currentRecording = null;
 
             renderRecordings();
-            alert('Sauvegardé ✓');
+            alert('✅ Enregistrement sauvegardé (IndexedDB)');
         });
 
         // Audio upload handler
@@ -12197,7 +12547,13 @@ Ils seront préservés lors de l'affichage !"></textarea>
                             </div>
                         </div>
                         ${rec.question ? `<div style="font-weight: 500; color: var(--crimson); margin-bottom: 0.75rem; font-size: 1rem;">Q: ${rec.question}</div>` : ''}
-                        ${rec.audioData ? `
+                        ${rec.hasAudio ? `
+                            <div id="audio-player-${rec.id}" style="margin: 1rem 0;">
+                                <button class="btn btn-secondary" onclick="loadAndPlayRecording(${rec.id})" style="width: 100%;">
+                                    ▶️ Écouter l'enregistrement
+                                </button>
+                            </div>
+                        ` : rec.audioData ? `
                             <audio controls style="width: 100%; margin: 1rem 0;">
                                 <source src="${rec.audioData}" type="audio/webm">
                             </audio>
@@ -12207,12 +12563,46 @@ Ils seront préservés lors de l'affichage !"></textarea>
                 `;
             }).join('');
         }
+        
+        // Load and play recording from IndexedDB
+        window.loadAndPlayRecording = async function(recordingId) {
+            const playerDiv = document.getElementById(`audio-player-${recordingId}`);
+            if (!playerDiv) return;
+            
+            try {
+                playerDiv.innerHTML = '<p style="text-align: center; color: var(--text);">⏳ Chargement...</p>';
+                
+                const result = await AudioStorage.getRecording(recordingId);
+                if (!result || !result.audioBlob) {
+                    playerDiv.innerHTML = '<p style="text-align: center; color: var(--crimson);">❌ Audio introuvable</p>';
+                    return;
+                }
+                
+                const audioURL = URL.createObjectURL(result.audioBlob);
+                playerDiv.innerHTML = `
+                    <audio controls style="width: 100%;" autoplay>
+                        <source src="${audioURL}" type="audio/wav">
+                    </audio>
+                    <p style="font-size: 0.85rem; color: var(--text); margin-top: 0.5rem; text-align: center;">
+                        📊 ${(result.audioBlob.size / 1024).toFixed(0)} KB
+                    </p>
+                `;
+            } catch (error) {
+                console.error('Error loading recording:', error);
+                playerDiv.innerHTML = '<p style="text-align: center; color: var(--crimson);">❌ Erreur de chargement</p>';
+            }
+        };
 
         function editRecording(id) {
-            const rec = recordings.find(r => r.id === id);
-            if (!rec) return;
+            const numericId = Number(id);
+            const rec = recordings.find(r => Number(r.id) === numericId);
+            if (!rec) {
+                console.error('❌ Recording not found! ID:', numericId);
+                alert(`❌ ERROR: Recording not found! ID: ${numericId}`);
+                return;
+            }
 
-            document.getElementById('edit-recording-id').value = id;
+            document.getElementById('edit-recording-id').value = numericId;
             document.getElementById('edit-recording-question').value = rec.question || '';
             document.getElementById('edit-recording-note').value = rec.note || '';
 
@@ -12223,24 +12613,45 @@ Ils seront préservés lors de l'affichage !"></textarea>
         document.getElementById('edit-recording-form').addEventListener('submit', (e) => {
             e.preventDefault();
             
-            const id = parseInt(document.getElementById('edit-recording-id').value);
-            const index = recordings.findIndex(r => r.id === id);
+            const id = Number(document.getElementById('edit-recording-id').value);
+            console.log('💾 Saving recording edit for ID:', id, 'Type:', typeof id);
             
-            if (index === -1) return;
+            const index = recordings.findIndex(r => Number(r.id) === id);
+            
+            if (index === -1) {
+                console.error('❌ Could not find recording with ID:', id);
+                alert(`❌ ERROR: Recording not found! ID: ${id}`);
+                return;
+            }
 
             recordings[index] = {
                 ...recordings[index],
+                id: id, // Ensure ID stays as number
                 question: document.getElementById('edit-recording-question').value.trim(),
                 note: document.getElementById('edit-recording-note').value.trim() || ''
             };
                 syncToFirebase(); // Auto-save recordings to Firebase
+            console.log('✅ Recording saved successfully:', recordings[index]);
             renderRecordings();
             closeModal('edit-recording-modal');
         });
 
-        function deleteRecording(id) {
+        async function deleteRecording(id) {
             if (confirm('Supprimer cet enregistrement ?')) {
-                recordings = recordings.filter(r => r.id !== id);
+                const numericId = Number(id);
+                
+                // Delete from IndexedDB if audio exists there
+                const rec = recordings.find(r => Number(r.id) === numericId);
+                if (rec && rec.hasAudio) {
+                    try {
+                        await AudioStorage.deleteRecording(numericId);
+                        console.log('✅ Audio deleted from IndexedDB');
+                    } catch (error) {
+                        console.error('Error deleting from IndexedDB:', error);
+                    }
+                }
+                
+                recordings = recordings.filter(r => Number(r.id) !== numericId);
                 syncToFirebase(); // Auto-save recordings to Firebase
                 renderRecordings();
             }
@@ -12532,10 +12943,15 @@ Ils seront préservés lors de l'affichage !"></textarea>
         };
 
         function editWriting(id) {
-            const writing = writings.find(w => w.id === id);
-            if (!writing) return;
+            const numericId = Number(id);
+            const writing = writings.find(w => Number(w.id) === numericId);
+            if (!writing) {
+                console.error('❌ Writing not found! ID:', numericId);
+                alert(`❌ ERROR: Writing not found! ID: ${numericId}`);
+                return;
+            }
 
-            document.getElementById('edit-writing-id').value = id;
+            document.getElementById('edit-writing-id').value = numericId;
             document.getElementById('edit-writing-title').value = writing.title || '';
             document.getElementById('edit-writing-text').value = writing.text;
 
@@ -12546,13 +12962,20 @@ Ils seront préservés lors de l'affichage !"></textarea>
         document.getElementById('edit-writing-form').addEventListener('submit', (e) => {
             e.preventDefault();
             
-            const id = parseInt(document.getElementById('edit-writing-id').value);
-            const index = writings.findIndex(w => w.id === id);
+            const id = Number(document.getElementById('edit-writing-id').value);
+            console.log('💾 Saving writing edit for ID:', id, 'Type:', typeof id);
             
-            if (index === -1) return;
+            const index = writings.findIndex(w => Number(w.id) === id);
+            
+            if (index === -1) {
+                console.error('❌ Could not find writing with ID:', id);
+                alert(`❌ ERROR: Writing not found! ID: ${id}`);
+                return;
+            }
 
             writings[index] = {
                 ...writings[index],
+                id: id, // Ensure ID stays as number
                 title: document.getElementById('edit-writing-title').value.trim() || null,
                 text: document.getElementById('edit-writing-text').value.trim()
             };
@@ -12562,6 +12985,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
                 alert('Veuillez entrer un texte');
                 return;
             }            syncToFirebase(); // Auto-save writings to Firebase
+            console.log('✅ Writing saved successfully:', writings[index]);
             renderWritingsArchive();
             closeModal('edit-writing-modal');
         });
@@ -12586,7 +13010,8 @@ Ils seront préservés lors de l'affichage !"></textarea>
 
         function deleteWriting(id) {
             if (confirm('Supprimer cette écriture ?')) {
-                writings = writings.filter(w => w.id !== id);
+                const numericId = Number(id);
+                writings = writings.filter(w => Number(w.id) !== numericId);
                 syncToFirebase(); // Auto-save writings to Firebase
                 renderWritingsArchive();
             }
@@ -13502,10 +13927,15 @@ Ils seront préservés lors de l'affichage !"></textarea>
         }
 
         function editNote(id) {
-            const note = notes.find(n => n.id === id);
-            if (!note) return;
+            const numericId = Number(id);
+            const note = notes.find(n => Number(n.id) === numericId);
+            if (!note) {
+                console.error('❌ Note not found! ID:', numericId);
+                alert(`❌ ERROR: Note not found! ID: ${numericId}`);
+                return;
+            }
 
-            document.getElementById('edit-note-id').value = id;
+            document.getElementById('edit-note-id').value = numericId;
             document.getElementById('edit-note-category').value = note.category;
             document.getElementById('edit-note-title').value = note.title;
             document.getElementById('edit-note-content').value = note.content;
@@ -13516,7 +13946,8 @@ Ils seront préservés lors de l'affichage !"></textarea>
 
         function deleteNote(id) {
             if (confirm('Supprimer cette note ?')) {
-                notes = notes.filter(n => n.id !== id);
+                const numericId = Number(id);
+                notes = notes.filter(n => Number(n.id) !== numericId);
                 syncToFirebase(); // Auto-save notes to Firebase
                 renderNotes();
             }
@@ -13561,13 +13992,20 @@ Ils seront préservés lors de l'affichage !"></textarea>
         document.getElementById('edit-note-form').addEventListener('submit', (e) => {
             e.preventDefault();
             
-            const id = parseInt(document.getElementById('edit-note-id').value);
-            const index = notes.findIndex(n => n.id === id);
+            const id = Number(document.getElementById('edit-note-id').value);
+            console.log('💾 Saving note edit for ID:', id, 'Type:', typeof id);
             
-            if (index === -1) return;
+            const index = notes.findIndex(n => Number(n.id) === id);
+            
+            if (index === -1) {
+                console.error('❌ Could not find note with ID:', id);
+                alert(`❌ ERROR: Note not found! ID: ${id}`);
+                return;
+            }
 
             notes[index] = {
                 ...notes[index],
+                id: id, // Ensure ID stays as number
                 category: document.getElementById('edit-note-category').value,
                 title: document.getElementById('edit-note-title').value.trim(),
                 content: document.getElementById('edit-note-content').value.trim(),
@@ -13579,6 +14017,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
                 alert('Veuillez remplir tous les champs requis');
                 return;
             }            syncToFirebase(); // Auto-save notes to Firebase
+            console.log('✅ Note saved successfully:', notes[index]);
             renderNotes();
             closeModal('edit-note-modal');
         });
@@ -14683,7 +15122,14 @@ Ils seront préservés lors de l'affichage !"></textarea>
                     }
                     
                     if (data.listeningList) {
-                        listeningList = data.listeningList;
+                        // 🧹 CLEANUP: Remove any broken items from Firebase data
+                        const beforeCount = data.listeningList.length;
+                        listeningList = data.listeningList.filter(item => item && item.id && item.title);
+                        if (beforeCount !== listeningList.length) {
+                            console.log(`🧹 Firebase cleanup: removed ${beforeCount - listeningList.length} invalid items`);
+                            // Save cleaned data back to Firebase
+                            setTimeout(() => saveDataToFirebase(), 1000);
+                        }
                     }
                     
                     if (data.recordings) {
@@ -14723,6 +15169,11 @@ Ils seront préservés lors de l'affichage !"></textarea>
                     if (data.mistakeCorrections) {
                         mistakeCorrections = data.mistakeCorrections;
                         console.log('✅ Loaded', mistakeCorrections.length, 'mistake corrections');
+                    }
+                    
+                    if (data.transcriptWordStatus) {
+                        window.transcriptWordStatus = data.transcriptWordStatus;
+                        console.log('✅ Loaded', Object.keys(window.transcriptWordStatus).length, 'word statuses');
                     }
                     
                     // CRITICAL: Rebuild presence data from ALL existing entries
@@ -14785,7 +15236,15 @@ Ils seront préservés lors de l'affichage !"></textarea>
                         
                         if (localVocab) vocabulary = JSON.parse(localVocab);
                         if (localReadings) readingList = JSON.parse(localReadings);
-                        if (localListening) listeningList = JSON.parse(localListening);
+                        if (localListening) {
+                            listeningList = JSON.parse(localListening);
+                            // 🧹 CLEANUP: Don't migrate broken items to Firebase
+                            const beforeCount = listeningList.length;
+                            listeningList = listeningList.filter(item => item && item.id && item.title);
+                            if (beforeCount !== listeningList.length) {
+                                console.log(`🧹 Migration cleanup: removed ${beforeCount - listeningList.length} invalid items`);
+                            }
+                        }
                         if (localRecordings) recordings = JSON.parse(localRecordings);
                         if (localWritings) writings = JSON.parse(localWritings);
                         if (localNotes) notes = JSON.parse(localNotes);
@@ -15513,25 +15972,39 @@ Ils seront préservés lors de l'affichage !"></textarea>
         }
 
         // Open listening player
-        window.openListeningPlayer = function(itemId) {
-            console.log('🎵 openListeningPlayer called for itemId:', itemId);
+        window.openListeningPlayer = async function(itemId) {
+            console.log('🎵 openListeningPlayer called for itemId:', itemId, 'Type:', typeof itemId);
             
-            // FORCE reload from localStorage to ensure fresh data
+            // First, try to sync from Firebase to get latest data
+            try {
+                await syncFromFirebase();
+                console.log('✅ Synced from Firebase before opening player');
+            } catch (e) {
+                console.warn('⚠️ Firebase sync failed, trying localStorage:', e);
+            }
+            
+            // Try localStorage as backup
             try {
                 const freshData = localStorage.getItem('listeningList');
                 if (freshData) {
                     const freshList = JSON.parse(freshData);
-                    console.log('🔄 Force-reloaded listeningList from localStorage');
+                    console.log('🔄 Loaded from localStorage');
                     listeningList = freshList;
                 }
             } catch (e) {
                 console.error('Failed to reload from localStorage:', e);
             }
             
-            const item = listeningList.find(l => l.id === itemId);
+            // Ensure numeric comparison
+            const numericId = Number(itemId);
+            console.log('🔍 Searching for ID:', numericId);
+            console.log('📋 Available IDs:', listeningList.map(l => ({ id: l.id, type: typeof l.id })));
+            
+            const item = listeningList.find(l => Number(l.id) === numericId);
             if (!item) {
-                console.error('❌ Item not found!');
-                alert('ERROR: Item not found! ID: ' + itemId);
+                console.error('❌ Item not found after sync! ID:', numericId);
+                alert(`❌ ERROR: Item not found! ID: ${numericId}`);
+                renderListeningList();
                 return;
             }
 
@@ -15873,6 +16346,10 @@ Ils seront préservés lors de l'affichage !"></textarea>
             }
         }
 
+        // Track if user has manually scrolled the transcript
+        let userHasScrolled = false;
+        let scrollTimeout = null;
+
         function highlightCurrentLine(currentTime) {
             const lines = document.querySelectorAll('.transcript-line');
             let activeIndex = -1;
@@ -15896,11 +16373,38 @@ Ils seront préservés lors de l'affichage !"></textarea>
                 }
             });
             
-            // Auto-scroll to active line
-            if (activeIndex >= 0 && lines[activeIndex]) {
+            // Auto-scroll to active line ONLY if user hasn't manually scrolled
+            if (activeIndex >= 0 && lines[activeIndex] && !userHasScrolled) {
                 lines[activeIndex].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }
         }
+        
+        // Detect when user manually scrolls or touches the transcript
+        document.addEventListener('DOMContentLoaded', function() {
+            const transcriptContainer = document.querySelector('.clickable-transcript, #transcript-div');
+            if (transcriptContainer) {
+                // Reset userHasScrolled when audio starts playing
+                const resetScroll = () => {
+                    userHasScrolled = false;
+                };
+                
+                // Detect manual scrolling
+                transcriptContainer.addEventListener('touchstart', () => {
+                    userHasScrolled = true;
+                    clearTimeout(scrollTimeout);
+                    // Re-enable auto-scroll after 3 seconds of no interaction
+                    scrollTimeout = setTimeout(resetScroll, 3000);
+                });
+                
+                transcriptContainer.addEventListener('scroll', (e) => {
+                    // Only mark as user scroll if it's not from our auto-scroll
+                    if (!e.isTrusted) return;
+                    userHasScrolled = true;
+                    clearTimeout(scrollTimeout);
+                    scrollTimeout = setTimeout(resetScroll, 3000);
+                }, { passive: true });
+            }
+        });
 
     </script>
 
@@ -16235,6 +16739,14 @@ Ils seront préservés lors de l'affichage !"></textarea>
             <textarea class="form-textarea" id="word-analysis-meaning" placeholder="Écris ce que ce mot signifie pour toi..." rows="3"></textarea>
         </div>
         
+        <div class="form-group">
+            <label class="form-label">📝 Contexte (optionnel)</label>
+            <textarea class="form-textarea" id="word-analysis-context" placeholder="La phrase où tu as trouvé ce mot..." rows="2" style="font-size: 0.95rem; font-style: italic; background: var(--whisper);"></textarea>
+            <div style="font-size: 0.8rem; color: var(--text-soft); margin-top: 0.3rem;">
+                💡 Le contexte t'aide à te souvenir comment ce mot est utilisé!
+            </div>
+        </div>
+        
         <div style="margin: 1rem 0; padding: 1rem; background: var(--whisper); border-radius: 8px;">
             <div style="font-size: 0.9rem; font-weight: 500; margin-bottom: 0.5rem; color: var(--text-soft);">📚 Dictionnaires:</div>
             <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
@@ -16435,8 +16947,8 @@ Ils seront préservés lors de l'affichage !"></textarea>
                 }
                 updateToolbar();
             } else {
-                // Single word analysis (original behavior)
-                openWordAnalysisPopup(word, original);
+                // Single word analysis (original behavior) - PASS ELEMENT FOR CONTEXT
+                openWordAnalysisPopup(word, original, element);
             }
         }
         
@@ -16458,7 +16970,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
             openWordAnalysisPopup(words[0], wordText);
         }
         
-        function openWordAnalysisPopup(word, original) {
+        function openWordAnalysisPopup(word, original, contextElement) {
             currentAnalyzingWord = word;
             currentAnalyzingOriginal = original;
             
@@ -16466,6 +16978,24 @@ Ils seront préservés lors de l'affichage !"></textarea>
             document.getElementById('word-analysis-popup').style.display = 'block';
             document.getElementById('word-analysis-word').value = original;
             document.getElementById('word-analysis-meaning').value = '';
+            
+            // AUTO-CAPTURE CONTEXT from transcript!
+            let capturedContext = '';
+            if (contextElement) {
+                // Find the parent transcript line
+                const transcriptLine = contextElement.closest('.transcript-line');
+                if (transcriptLine) {
+                    capturedContext = transcriptLine.textContent.trim();
+                } else {
+                    // Fallback: try to get surrounding text
+                    const parent = contextElement.parentElement;
+                    if (parent) {
+                        capturedContext = parent.textContent.trim();
+                    }
+                }
+            }
+            
+            document.getElementById('word-analysis-context').value = capturedContext;
             document.getElementById('word-analysis-meaning').focus();
             
             // Update dictionary links
@@ -16479,6 +17009,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
         function closeWordAnalysisPopup() {
             document.getElementById('word-analysis-overlay').style.display = 'none';
             document.getElementById('word-analysis-popup').style.display = 'none';
+            document.getElementById('word-analysis-context').value = ''; // Clear context
             currentAnalyzingWord = null;
             currentAnalyzingOriginal = null;
             window._batchSelectedWords = null;
@@ -16507,6 +17038,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
             });
             
             const count = batchWords.length;
+            syncToFirebase(); // Save word status immediately
             alert(`✅ ${count} mot${count > 1 ? 's' : ''} marqué${count > 1 ? 's' : ''} comme inconnu${count > 1 ? 's' : ''} (orange)`);
             closeWordAnalysisPopup();
         }
@@ -16525,11 +17057,15 @@ Ils seront préservés lors de l'affichage !"></textarea>
             // Check if this is a batch operation
             const batchWords = window._batchSelectedWords || [currentAnalyzingWord];
             
+            // Get the context from the form
+            const context = document.getElementById('word-analysis-context').value.trim();
+            
             // Add to vocabulary (Le Jardin)
             const newWord = {
                 id: Date.now(),
                 word: wordText,
                 meaning: meaning,
+                context: context || '', // Save the context!
                 article: '',
                 gender: '',
                 theme: 'transcription',
