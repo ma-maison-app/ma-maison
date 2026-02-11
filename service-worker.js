@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ma-maison-v7-MULTI-SELECT';
+const CACHE_NAME = 'ma-maison-v8-ID-FIX-COMPLETE';
 const urlsToCache = [
   './',
   'https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&family=Work+Sans:wght@300;400;500&family=Allura&display=swap',
@@ -8,7 +8,7 @@ const urlsToCache = [
 
 // Install event - cache resources
 self.addEventListener('install', (event) => {
-  console.log('Service Worker: Installing...');
+  console.log('Service Worker: Installing v8 (ID FIX COMPLETE)...');
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
@@ -35,7 +35,7 @@ self.addEventListener('install', (event) => {
 
 // Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
-  console.log('Service Worker: Activating...');
+  console.log('Service Worker: Activating v8...');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
@@ -46,7 +46,10 @@ self.addEventListener('activate', (event) => {
           }
         })
       );
-    }).then(() => self.clients.claim())
+    }).then(() => {
+      console.log('Service Worker: v8 activated, claiming clients');
+      return self.clients.claim();
+    })
   );
 });
 
@@ -79,12 +82,14 @@ self.addEventListener('fetch', (event) => {
             const responseToCache = response.clone();
             caches.open(CACHE_NAME).then((cache) => {
               cache.put(request, responseToCache);
+              console.log('Service Worker: Cached updated HTML:', url.pathname);
             });
           }
           return response;
         })
         .catch(() => {
           // Only use cache if network fails (offline)
+          console.log('Service Worker: Network failed, serving from cache:', url.pathname);
           return caches.match(request).then((cached) => {
             return cached || caches.match('./index.html');
           });
