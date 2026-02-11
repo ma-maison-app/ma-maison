@@ -14963,7 +14963,14 @@ Ils seront préservés lors de l'affichage !"></textarea>
                     }
                     
                     if (data.listeningList) {
-                        listeningList = data.listeningList;
+                        // 🧹 CLEANUP: Remove any broken items from Firebase data
+                        const beforeCount = data.listeningList.length;
+                        listeningList = data.listeningList.filter(item => item && item.id && item.title);
+                        if (beforeCount !== listeningList.length) {
+                            console.log(`🧹 Firebase cleanup: removed ${beforeCount - listeningList.length} invalid items`);
+                            // Save cleaned data back to Firebase
+                            setTimeout(() => saveDataToFirebase(), 1000);
+                        }
                     }
                     
                     if (data.recordings) {
@@ -15070,7 +15077,15 @@ Ils seront préservés lors de l'affichage !"></textarea>
                         
                         if (localVocab) vocabulary = JSON.parse(localVocab);
                         if (localReadings) readingList = JSON.parse(localReadings);
-                        if (localListening) listeningList = JSON.parse(localListening);
+                        if (localListening) {
+                            listeningList = JSON.parse(localListening);
+                            // 🧹 CLEANUP: Don't migrate broken items to Firebase
+                            const beforeCount = listeningList.length;
+                            listeningList = listeningList.filter(item => item && item.id && item.title);
+                            if (beforeCount !== listeningList.length) {
+                                console.log(`🧹 Migration cleanup: removed ${beforeCount - listeningList.length} invalid items`);
+                            }
+                        }
                         if (localRecordings) recordings = JSON.parse(localRecordings);
                         if (localWritings) writings = JSON.parse(localWritings);
                         if (localNotes) notes = JSON.parse(localNotes);
