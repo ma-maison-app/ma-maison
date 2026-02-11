@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ma-maison-v8-ID-FIX-COMPLETE';
+const CACHE_NAME = 'ma-maison-v9-ID-FIX-COMPLETE';
 const urlsToCache = [
   './',
   'https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&family=Work+Sans:wght@300;400;500&family=Allura&display=swap',
