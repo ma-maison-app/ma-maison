@@ -8457,7 +8457,16 @@ Ils seront préservés lors de l'affichage !"></textarea>
             
             if (localVocab) vocabulary = JSON.parse(localVocab);
             if (localReadings) readingList = JSON.parse(localReadings);
-            if (localListening) listeningList = JSON.parse(localListening);
+            if (localListening) {
+                listeningList = JSON.parse(localListening);
+                // 🧹 ONE-TIME CLEANUP: Remove any orphaned items that cause errors
+                const beforeCount = listeningList.length;
+                listeningList = listeningList.filter(item => item && item.id && item.title);
+                if (beforeCount !== listeningList.length) {
+                    console.log(`🧹 Cleaned up ${beforeCount - listeningList.length} invalid items`);
+                    localStorage.setItem('listeningList', JSON.stringify(listeningList));
+                }
+            }
             if (localRecordings) recordings = JSON.parse(localRecordings);
             if (localWritings) writings = JSON.parse(localWritings);
             if (localNotes) notes = JSON.parse(localNotes);
@@ -11199,8 +11208,23 @@ Ils seront préservés lors de l'affichage !"></textarea>
         }
 
         function editListening(id) {
+            console.log('✏️ Editing item:', id);
             const item = listeningList.find(l => l.id === id);
-            if (!item) return;
+            if (!item) {
+                console.error('❌ Item not found in current data!', id);
+                alert('Erreur: Élément introuvable. Actualisez la page (glissez vers le bas pour recharger).');
+                // Force reload from localStorage and re-render
+                try {
+                    const freshData = localStorage.getItem('listeningList');
+                    if (freshData) {
+                        listeningList = JSON.parse(freshData);
+                        renderListeningList();
+                    }
+                } catch (e) {
+                    console.error('Failed to reload:', e);
+                }
+                return;
+            }
 
             document.getElementById('edit-listening-id').value = id;
             document.getElementById('edit-listening-type').value = item.type;
@@ -15791,8 +15815,18 @@ Ils seront préservés lors de l'affichage !"></textarea>
             
             const item = listeningList.find(l => l.id === itemId);
             if (!item) {
-                console.error('❌ Item not found!');
-                alert('ERROR: Item not found! ID: ' + itemId);
+                console.error('❌ Item not found in current data!');
+                alert('Erreur: Élément introuvable. Actualisez la page (glissez vers le bas pour recharger).');
+                // Force reload and re-render
+                try {
+                    const freshData = localStorage.getItem('listeningList');
+                    if (freshData) {
+                        listeningList = JSON.parse(freshData);
+                        renderListeningList();
+                    }
+                } catch (e) {
+                    console.error('Failed to reload:', e);
+                }
                 return;
             }
 
