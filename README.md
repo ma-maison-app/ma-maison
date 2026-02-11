@@ -335,6 +335,39 @@ const FirebaseREST = {
         this.currentUser.token = data.id_token;
         this.currentUser.refreshToken = data.refresh_token;
         await this.storeUser(this.currentUser);
+    },
+
+    // ── Cloudinary Audio Upload (free, no credit card!) ──────────────────
+    uploadAudio: async function(filePath, audioBlob) {
+        const CLOUD_NAME = 'dybhbwmwd';
+        const UPLOAD_PRESET = 'Ma Maison';
+
+        const formData = new FormData();
+        formData.append('file', audioBlob, 'recording.wav');
+        formData.append('upload_preset', UPLOAD_PRESET);
+        // Tag with user ID so recordings stay organised
+        if (this.currentUser) {
+            formData.append('tags', `user_${this.currentUser.uid}`);
+            formData.append('public_id', `recordings/${this.currentUser.uid}/${Date.now()}`);
+        }
+        formData.append('resource_type', 'video'); // Cloudinary uses 'video' for audio
+
+        const response = await fetch(
+            `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/video/upload`,
+            { method: 'POST', body: formData }
+        );
+
+        const result = await response.json();
+        if (result.error) throw new Error(result.error.message || JSON.stringify(result.error));
+
+        console.log('✅ Audio uploaded to Cloudinary:', result.secure_url);
+        return result.secure_url; // Permanent HTTPS URL, works on any device!
+    },
+
+    deleteAudio: async function(publicId) {
+        // Cloudinary unsigned presets don't support deletion from client-side
+        // Audio will remain in Cloudinary but metadata is removed from Firestore
+        console.log('ℹ️ Cloudinary: audio file kept in cloud (deletion requires server-side)');
     }
 };
 
@@ -6389,9 +6422,6 @@ const firebaseConfig = {
                 </div>
 
                 <div style="text-align: center; display: flex; gap: 1rem; justify-content: center; align-items: center;">
-                    <button class="btn btn-secondary" onclick="forceRefreshListeningList()" title="Actualiser les données">
-                        🔄 Actualiser
-                    </button>
                     <button class="btn btn-primary" id="add-listening-btn">Ajouter du contenu</button>
                 </div>
             </div>
@@ -12499,32 +12529,54 @@ Ils seront préservés lors de l'affichage !"></textarea>
             const question = document.getElementById('parler-question').value.trim();
             const recordingId = Date.now();
 
-            // Save audio to IndexedDB (not in Firebase!)
-            try {
-                await AudioStorage.saveRecording(recordingId, currentRecording);
-                console.log('✅ Audio saved to IndexedDB');
-            } catch (error) {
-                console.error('❌ Failed to save audio to IndexedDB:', error);
-                alert('Erreur de sauvegarde audio');
-                return;
+            // Normalize to Blob
+            let audioBlob = currentRecording;
+            if (typeof currentRecording === 'string' && currentRecording.startsWith('data:')) {
+                const res = await fetch(currentRecording);
+                audioBlob = await res.blob();
             }
 
-            // Save metadata only (no audio data)
+            // ── Upload to Cloudinary (free, cross-device!) ─────────────────
+            let audioURL = null;
+            if (window.currentUser && window.firebaseReady) {
+                try {
+                    const filePath = `recordings/${window.currentUser.uid}/${recordingId}.wav`;
+                    audioURL = await FirebaseREST.uploadAudio(filePath, audioBlob);
+                    console.log('✅ Audio uploaded to Cloudinary');
+                } catch (error) {
+                    console.error('❌ Cloudinary upload failed, falling back to IndexedDB:', error);
+                }
+            }
+
+            // ── Fallback: save locally in IndexedDB if not logged in / upload failed
+            if (!audioURL) {
+                try {
+                    await AudioStorage.saveRecording(recordingId, audioBlob);
+                    console.log('✅ Audio saved to IndexedDB (offline fallback)');
+                } catch (error) {
+                    console.error('❌ IndexedDB save also failed:', error);
+                    alert('Erreur de sauvegarde audio');
+                    return;
+                }
+            }
+
+            // ── Save metadata to Firestore ───────────────────────────────────
             const recording = {
                 id: recordingId,
                 question: question || 'Sans question',
-                hasAudio: true, // Flag that audio is in IndexedDB
-                duration: 0, // Could calculate this if needed
+                hasAudio: true,
+                audioURL: audioURL || null,   // Cloudinary URL (cross-device, permanent)
+                hasLocalAudio: !audioURL,     // true = stored in IndexedDB only
+                duration: 0,
                 note: document.getElementById('recording-note').value.trim() || '',
                 created: new Date().toISOString()
             };
 
             recordings.push(recording);
-            syncToFirebase(); // Only syncs metadata, not audio!
-            
-            // Log action for presence tracking
+            syncToFirebase();
+
             logAction(ACTION_TYPES.SPEAKING);
-            
+
             // Clear UI
             document.getElementById('spoken-text').textContent = '';
             document.getElementById('recording-note').value = '';
@@ -12534,7 +12586,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
             currentRecording = null;
 
             renderRecordings();
-            alert('✅ Enregistrement sauvegardé (IndexedDB)');
+            alert(audioURL ? '✅ Enregistrement sauvegardé sur Cloudinary ☁️' : '✅ Enregistrement sauvegardé localement');
         });
 
         // Audio upload handler
@@ -12643,29 +12695,45 @@ Ils seront préservés lors de l'affichage !"></textarea>
             }).join('');
         }
         
-        // Load and play recording from IndexedDB
+        // Load and play recording — tries Firebase Storage first, falls back to IndexedDB
         window.loadAndPlayRecording = async function(recordingId) {
             const playerDiv = document.getElementById(`audio-player-${recordingId}`);
             if (!playerDiv) return;
-            
+
+            playerDiv.innerHTML = '<p style="text-align: center; color: var(--text);">⏳ Chargement...</p>';
+
             try {
-                playerDiv.innerHTML = '<p style="text-align: center; color: var(--text);">⏳ Chargement...</p>';
-                
-                const result = await AudioStorage.getRecording(recordingId);
-                if (!result || !result.audioBlob) {
-                    playerDiv.innerHTML = '<p style="text-align: center; color: var(--crimson);">❌ Audio introuvable</p>';
-                    return;
+                // Check if this recording has a Firebase Storage URL
+                const numericId = Number(recordingId);
+                const rec = recordings.find(r => Number(r.id) === numericId);
+
+                if (rec && rec.audioURL) {
+                    // ✅ Cloudinary URL — works on any device!
+                    playerDiv.innerHTML = `
+                        <audio controls style="width: 100%;" autoplay>
+                            <source src="${rec.audioURL}" type="audio/wav">
+                        </audio>
+                        <p style="font-size: 0.85rem; color: var(--text); margin-top: 0.5rem; text-align: center;">
+                            ☁️ Depuis Firebase
+                        </p>
+                    `;
+                } else {
+                    // Fallback: try IndexedDB (local recordings)
+                    const result = await AudioStorage.getRecording(recordingId);
+                    if (!result || !result.audioBlob) {
+                        playerDiv.innerHTML = '<p style="text-align: center; color: var(--crimson);">❌ Audio introuvable (enregistré sur un autre appareil?)</p>';
+                        return;
+                    }
+                    const audioURL = URL.createObjectURL(result.audioBlob);
+                    playerDiv.innerHTML = `
+                        <audio controls style="width: 100%;" autoplay>
+                            <source src="${audioURL}" type="audio/wav">
+                        </audio>
+                        <p style="font-size: 0.85rem; color: var(--text); margin-top: 0.5rem; text-align: center;">
+                            📊 ${(result.audioBlob.size / 1024).toFixed(0)} KB (local)
+                        </p>
+                    `;
                 }
-                
-                const audioURL = URL.createObjectURL(result.audioBlob);
-                playerDiv.innerHTML = `
-                    <audio controls style="width: 100%;" autoplay>
-                        <source src="${audioURL}" type="audio/wav">
-                    </audio>
-                    <p style="font-size: 0.85rem; color: var(--text); margin-top: 0.5rem; text-align: center;">
-                        📊 ${(result.audioBlob.size / 1024).toFixed(0)} KB
-                    </p>
-                `;
             } catch (error) {
                 console.error('Error loading recording:', error);
                 playerDiv.innerHTML = '<p style="text-align: center; color: var(--crimson);">❌ Erreur de chargement</p>';
@@ -12718,20 +12786,30 @@ Ils seront préservés lors de l'affichage !"></textarea>
         async function deleteRecording(id) {
             if (confirm('Supprimer cet enregistrement ?')) {
                 const numericId = Number(id);
-                
-                // Delete from IndexedDB if audio exists there
                 const rec = recordings.find(r => Number(r.id) === numericId);
-                if (rec && rec.hasAudio) {
-                    try {
-                        await AudioStorage.deleteRecording(numericId);
-                        console.log('✅ Audio deleted from IndexedDB');
-                    } catch (error) {
-                        console.error('Error deleting from IndexedDB:', error);
+
+                if (rec) {
+                    // Delete from Cloudinary if it was uploaded there
+                    if (rec.audioURL && window.currentUser) {
+                        try {
+                            const filePath = `recordings/${window.currentUser.uid}/${numericId}.wav`;
+                            await FirebaseREST.deleteAudio(filePath);
+                        } catch (error) {
+                            console.warn('Could not delete from Cloudinary:', error);
+                        }
+                    }
+                    // Also clean up IndexedDB just in case
+                    if (rec.hasAudio || rec.hasLocalAudio) {
+                        try {
+                            await AudioStorage.deleteRecording(numericId);
+                        } catch (error) {
+                            // Fine if not there
+                        }
                     }
                 }
-                
+
                 recordings = recordings.filter(r => Number(r.id) !== numericId);
-                syncToFirebase(); // Auto-save recordings to Firebase
+                syncToFirebase();
                 renderRecordings();
             }
         }
