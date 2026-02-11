@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ma-maison-v9-FIXED-SYNC';
+const CACHE_NAME = 'ma-maison-v7-MULTI-SELECT';
 const urlsToCache = [
   './',
   'https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&family=Work+Sans:wght@300;400;500&family=Allura&display=swap',
@@ -8,7 +8,7 @@ const urlsToCache = [
 
 // Install event - cache resources
 self.addEventListener('install', (event) => {
-  console.log('Service Worker: Installing v9-FIXED-SYNC...');
+  console.log('Service Worker: Installing...');
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
@@ -24,7 +24,7 @@ self.addEventListener('install', (event) => {
         );
       })
       .then(() => {
-        console.log('Service Worker: Installation complete - v9-FIXED-SYNC');
+        console.log('Service Worker: Installation complete');
         return self.skipWaiting();
       })
       .catch((error) => {
@@ -35,7 +35,7 @@ self.addEventListener('install', (event) => {
 
 // Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
-  console.log('Service Worker: Activating v9-FIXED-SYNC...');
+  console.log('Service Worker: Activating...');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
@@ -46,10 +46,7 @@ self.addEventListener('activate', (event) => {
           }
         })
       );
-    }).then(() => {
-      console.log('Service Worker: Old caches cleared, claiming clients');
-      return self.clients.claim();
-    })
+    }).then(() => self.clients.claim())
   );
 });
 
@@ -82,14 +79,12 @@ self.addEventListener('fetch', (event) => {
             const responseToCache = response.clone();
             caches.open(CACHE_NAME).then((cache) => {
               cache.put(request, responseToCache);
-              console.log('Service Worker: Cached fresh HTML from network');
             });
           }
           return response;
         })
         .catch(() => {
           // Only use cache if network fails (offline)
-          console.log('Service Worker: Network failed, using cached HTML');
           return caches.match(request).then((cached) => {
             return cached || caches.match('./index.html');
           });
