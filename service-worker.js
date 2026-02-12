@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ma-maison-v13-cloudinary';
+const CACHE_NAME = 'ma-maison-v11-cloudinary';
 const urlsToCache = [
   './',
   'https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&family=Work+Sans:wght@300;400;500&family=Allura&display=swap',
@@ -8,7 +8,7 @@ const urlsToCache = [
 
 // Install event - cache resources
 self.addEventListener('install', (event) => {
-  console.log('Service Worker: Installing v10 (Cloudinary)...');
+  console.log('Service Worker: Installing v11 (Cloudinary)...');
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
@@ -34,7 +34,7 @@ self.addEventListener('install', (event) => {
 
 // Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
-  console.log('Service Worker: Activating v10...');
+  console.log('Service Worker: Activating v11...');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
@@ -46,7 +46,7 @@ self.addEventListener('activate', (event) => {
         })
       );
     }).then(() => {
-      console.log('Service Worker: v10 activated, claiming clients');
+      console.log('Service Worker: v11 activated, claiming clients');
       return self.clients.claim();
     })
   );
