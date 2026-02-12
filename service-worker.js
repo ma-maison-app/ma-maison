@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ma-maison-v12-cloudinary';
+const CACHE_NAME = 'ma-maison-v13-cloudinary';
 const urlsToCache = [
   './',
   'https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&family=Work+Sans:wght@300;400;500&family=Allura&display=swap',
