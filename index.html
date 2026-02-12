@@ -1411,7 +1411,7 @@ const firebaseConfig = {
             position: fixed;
             bottom: 2rem;
             right: 2rem;
-            z-index: 1000;
+            z-index: 10500; /* INCREASED - appears above listening player modal (9999) and word lookup modals (10001) */
         }
 
         .floating-btn-main {
@@ -8004,13 +8004,21 @@ Ils seront préservés lors de l'affichage !"></textarea>
                 
                 <div class="form-group">
                     <label class="form-label">📝 Texte français (paroles/transcription)</label>
-                    <div style="margin-bottom: 0.5rem;">
+                    <div style="margin-bottom: 0.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
                         <a href="https://downsub.com/" target="_blank" class="btn btn-secondary" style="display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; padding: 0.5rem 1rem;">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
                             </svg>
                             📄 Get Transcript (DownSub)
                         </a>
+                        <button type="button" class="btn btn-secondary" onclick="openAITimestampHelper()" style="display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; padding: 0.5rem 1rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+                                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                                <line x1="12" x2="12" y1="19" y2="22"/>
+                            </svg>
+                            🤖 AI Timestamp Helper
+                        </button>
                     </div>
                     <textarea class="form-textarea" id="listening-transcript-text" rows="8" placeholder="Colle les paroles ici..." required></textarea>
                 </div>
@@ -15960,6 +15968,32 @@ Ils seront préservés lors de l'affichage !"></textarea>
             }
         });
         
+        // AI Timestamp Helper (Change 1.4)
+        function openAITimestampHelper() {
+            const text = document.getElementById('listening-transcript-text').value.trim();
+            
+            if (!text) {
+                alert('📝 Colle d\'abord ton texte dans la zone de transcription !');
+                return;
+            }
+            
+            // Create the prompt for ChatGPT
+            const prompt = `Je veux ajouter des timestamps au format [00:00] à ce texte français. Voici le texte :
+
+${text}
+
+Peux-tu ajouter des timestamps réalistes au début de chaque ligne ? Format: [MM:SS] suivi du texte. Commence à 00:00 et ajoute environ 3-5 secondes entre chaque ligne selon la longueur. Retourne SEULEMENT le texte avec timestamps, sans explication.`;
+            
+            // Open ChatGPT with the prompt pre-filled
+            const encodedPrompt = encodeURIComponent(prompt);
+            window.open(`https://chat.openai.com/?q=${encodedPrompt}`, '_blank');
+            
+            // Show helpful message
+            setTimeout(() => {
+                alert('💡 ChatGPT va s\'ouvrir avec ton texte.\n\n1. ChatGPT va ajouter les timestamps\n2. Copie le résultat\n3. Colle-le dans la zone de transcription\n\nEnsuite tu pourras cliquer sur les mots pour les analyser !');
+            }, 500);
+        }
+        
         function openDictionary(type) {
             const word = document.getElementById('dictionary-word-input').value.trim();
             
@@ -16349,6 +16383,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
                     const currentTime = youtubePlayer.getCurrentTime();
                     listeningPlaybackPositions[currentListeningItem.id] = currentTime;
                     localStorage.setItem('listeningPlaybackPositions', JSON.stringify(listeningPlaybackPositions));
+                    syncToFirebase(); // Also sync to Firebase
                     console.log(`💾 Saved playback position: ${currentTime.toFixed(1)}s for item ${currentListeningItem.id}`);
                 } catch (e) {
                     console.warn('⚠️ Could not save playback position:', e);
@@ -17039,6 +17074,58 @@ Ils seront préservés lors de l'affichage !"></textarea>
             </div>
         </div>
         
+        <!-- Article & Gender -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label">Article (optionnel)</label>
+                <select class="form-select" id="word-analysis-article">
+                    <option value="">—</option>
+                    <option value="le">le (masculin)</option>
+                    <option value="la">la (féminin)</option>
+                    <option value="l'">l' (voyelle)</option>
+                    <option value="les">les (pluriel)</option>
+                </select>
+            </div>
+            
+            <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label">Genre (optionnel)</label>
+                <select class="form-select" id="word-analysis-gender">
+                    <option value="">—</option>
+                    <option value="masculin">masculin</option>
+                    <option value="féminin">féminin</option>
+                </select>
+            </div>
+        </div>
+        
+        <!-- Week, Quarter, Year -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem; margin-top: 1rem;">
+            <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label">Semaine</label>
+                <input type="text" class="form-input" id="word-analysis-week" placeholder="Ex: 1">
+            </div>
+            
+            <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label">Trimestre</label>
+                <select class="form-select" id="word-analysis-quarter">
+                    <option value="">—</option>
+                    <option value="Q1">Q1</option>
+                    <option value="Q2">Q2</option>
+                    <option value="Q3">Q3</option>
+                    <option value="Q4">Q4</option>
+                </select>
+            </div>
+            
+            <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label">Année</label>
+                <input type="text" class="form-input" id="word-analysis-year" placeholder="2026">
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">Thème (optionnel)</label>
+            <input type="text" class="form-input" id="word-analysis-theme" placeholder="Ex: musique, famille, voyage...">
+        </div>
+        
         <div style="margin: 1rem 0; padding: 1rem; background: var(--whisper); border-radius: 8px;">
             <div style="font-size: 0.9rem; font-weight: 500; margin-bottom: 0.5rem; color: var(--text-soft);">📚 Dictionnaires & Prononciation:</div>
             <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
@@ -17291,6 +17378,15 @@ Ils seront préservés lors de l'affichage !"></textarea>
             }
             
             document.getElementById('word-analysis-context').value = capturedContext;
+            
+            // AUTO-POPULATE FILTERS from active filters (Change 2)
+            document.getElementById('word-analysis-week').value = activeFilters.week || '';
+            document.getElementById('word-analysis-quarter').value = activeFilters.quarter || '';
+            document.getElementById('word-analysis-year').value = activeFilters.year || new Date().getFullYear().toString();
+            document.getElementById('word-analysis-theme').value = activeFilters.theme || 'transcription';
+            document.getElementById('word-analysis-article').value = '';
+            document.getElementById('word-analysis-gender').value = '';
+            
             document.getElementById('word-analysis-meaning').focus();
             
             // Update dictionary links
@@ -17353,21 +17449,29 @@ Ils seront préservés lors de l'affichage !"></textarea>
             // Check if this is a batch operation
             const batchWords = window._batchSelectedWords || [currentAnalyzingWord];
             
-            // Get the context from the form
+            // Get all the fields from the form
             const context = document.getElementById('word-analysis-context').value.trim();
+            const article = document.getElementById('word-analysis-article').value;
+            const gender = document.getElementById('word-analysis-gender').value;
+            const week = document.getElementById('word-analysis-week').value.trim();
+            const quarter = document.getElementById('word-analysis-quarter').value;
+            const year = document.getElementById('word-analysis-year').value.trim() || new Date().getFullYear().toString();
+            const theme = document.getElementById('word-analysis-theme').value.trim() || 'transcription';
             
             // Add to vocabulary (Le Jardin)
             const newWord = {
                 id: Date.now(),
-                french: wordText,  // FIXED: Changed from 'word' to 'french' to match the rendering template
+                french: wordText,
                 meaning: meaning,
-                context: context || '', // Save the context!
-                article: '',
-                gender: '',
-                theme: 'transcription',
-                week: '',
-                quarter: '',
-                year: new Date().getFullYear().toString(),
+                context: context || '',
+                article: article,
+                gender: gender,
+                theme: theme,
+                week: week,
+                quarter: quarter,
+                year: year,
+                contexts: ['', '', ''], // Empty contexts for now
+                note: '',
                 image: '',
                 favorite: false,
                 created: new Date().toISOString()
