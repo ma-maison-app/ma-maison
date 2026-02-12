@@ -337,37 +337,51 @@ const FirebaseREST = {
         await this.storeUser(this.currentUser);
     },
 
-    // ── Cloudinary Audio Upload (free, no credit card!) ──────────────────
+    // ── Firebase Storage REST API ──────────────────────────────────────────
     uploadAudio: async function(filePath, audioBlob) {
-        const CLOUD_NAME = 'dybhbwmwd';
-        const UPLOAD_PRESET = 'Ma Maison';
+        if (!this.currentUser) throw new Error('Not authenticated');
+        await this.refreshTokenIfNeeded();
 
-        const formData = new FormData();
-        formData.append('file', audioBlob, 'recording.wav');
-        formData.append('upload_preset', UPLOAD_PRESET);
-        // Tag with user ID so recordings stay organised
-        if (this.currentUser) {
-            formData.append('tags', `user_${this.currentUser.uid}`);
-            formData.append('public_id', `recordings/${this.currentUser.uid}/${Date.now()}`);
-        }
-        formData.append('resource_type', 'video'); // Cloudinary uses 'video' for audio
+        const bucket = this.config.storageBucket;
+        const encodedPath = encodeURIComponent(filePath);
+        const uploadUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o?uploadType=media&name=${encodedPath}`;
 
-        const response = await fetch(
-            `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/video/upload`,
-            { method: 'POST', body: formData }
-        );
+        const response = await fetch(uploadUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': audioBlob.type || 'audio/wav',
+                'Authorization': `Bearer ${this.currentUser.token}`
+            },
+            body: audioBlob
+        });
 
         const result = await response.json();
         if (result.error) throw new Error(result.error.message || JSON.stringify(result.error));
 
-        console.log('✅ Audio uploaded to Cloudinary:', result.secure_url);
-        return result.secure_url; // Permanent HTTPS URL, works on any device!
+        // Build the public download URL with auth token
+        const downloadUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodedPath}?alt=media&token=${result.downloadTokens}`;
+        console.log('✅ Audio uploaded to Firebase Storage:', downloadUrl);
+        return downloadUrl;
     },
 
-    deleteAudio: async function(publicId) {
-        // Cloudinary unsigned presets don't support deletion from client-side
-        // Audio will remain in Cloudinary but metadata is removed from Firestore
-        console.log('ℹ️ Cloudinary: audio file kept in cloud (deletion requires server-side)');
+    deleteAudio: async function(filePath) {
+        if (!this.currentUser) throw new Error('Not authenticated');
+        await this.refreshTokenIfNeeded();
+
+        const bucket = this.config.storageBucket;
+        const encodedPath = encodeURIComponent(filePath);
+        const url = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodedPath}`;
+
+        const response = await fetch(url, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${this.currentUser.token}` }
+        });
+
+        if (response.status !== 204 && response.status !== 200) {
+            console.warn('⚠️ Could not delete audio from Storage:', response.status);
+        } else {
+            console.log('✅ Audio deleted from Firebase Storage:', filePath);
+        }
     }
 };
 
@@ -5204,6 +5218,8 @@ const firebaseConfig = {
             right: 0;
             bottom: 0;
             background: rgba(0,0,0,0.5);
+            z-index: 10000;  /* Ensure overlay appears over listening player */
+        }
             z-index: 10000;
         }
 
@@ -6743,6 +6759,28 @@ const firebaseConfig = {
                 <div class="form-group">
                     <label class="form-label">Le mot en français</label>
                     <input type="text" class="form-input" id="word-input" required>
+                </div>
+
+                <!-- Dictionary Links Section -->
+                <div style="margin: 1rem 0; padding: 1rem; background: var(--whisper); border-radius: 8px;">
+                    <div style="font-size: 0.9rem; font-weight: 500; margin-bottom: 0.5rem; color: var(--text-soft);">📚 Dictionnaires & Prononciation:</div>
+                    <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                        <a id="main-link-wordreference" href="#" target="_blank" class="btn btn-secondary" style="font-size: 0.85rem; padding: 0.4rem 0.8rem; text-decoration: none;">
+                            WordReference
+                        </a>
+                        <a id="main-link-reverso" href="#" target="_blank" class="btn btn-secondary" style="font-size: 0.85rem; padding: 0.4rem 0.8rem; text-decoration: none;">
+                            Reverso
+                        </a>
+                        <a id="main-link-collins" href="#" target="_blank" class="btn btn-secondary" style="font-size: 0.85rem; padding: 0.4rem 0.8rem; text-decoration: none;">
+                            Collins
+                        </a>
+                        <a id="main-link-larousse" href="#" target="_blank" class="btn btn-secondary" style="font-size: 0.85rem; padding: 0.4rem 0.8rem; text-decoration: none;">
+                            Larousse
+                        </a>
+                        <a id="main-link-youglish" href="#" target="_blank" class="btn btn-secondary" style="font-size: 0.85rem; padding: 0.4rem 0.8rem; text-decoration: none; background: var(--rose-pale); color: var(--burgundy);">
+                            YouGlish
+                        </a>
+                    </div>
                 </div>
 
                 <div class="form-group">
@@ -12467,23 +12505,26 @@ Ils seront préservés lors de l'affichage !"></textarea>
                             audioChunks.push(event.data);
                         };
                         
-                        mediaRecorder.onstop = () => {
-                            // Build blob immediately — no async, no compression that can crash
+                        mediaRecorder.onstop = async () => {
                             const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                            const audioURL = URL.createObjectURL(audioBlob);
-                            currentRecording = audioBlob;
-
+                            
+                            // Compress audio before storing
+                            const compressedBlob = await compressAudio(audioBlob);
+                            
+                            // Create URL for preview
+                            const audioURL = URL.createObjectURL(compressedBlob);
+                            currentRecording = compressedBlob; // Store blob instead of base64!
+                            
                             spokenText.innerHTML = `
                                 <audio controls style="width: 100%; margin-top: 1rem;">
-                                    <source src="${audioURL}" type="audio/webm">
+                                    <source src="${audioURL}" type="audio/wav">
                                 </audio>
                                 <p style="font-size: 0.85rem; color: var(--text); margin-top: 0.5rem;">
-                                    📊 Taille: ${(audioBlob.size / 1024).toFixed(0)} KB
+                                    📊 Taille: ${(compressedBlob.size / 1024).toFixed(0)} KB (compressé)
                                 </p>
                             `;
-                            // Show save button + note field
                             controls.style.display = 'flex';
-
+                            
                             // Stop all tracks
                             stream.getTracks().forEach(track => track.stop());
                         };
@@ -12533,15 +12574,15 @@ Ils seront préservés lors de l'affichage !"></textarea>
                 audioBlob = await res.blob();
             }
 
-            // ── Upload to Cloudinary (free, cross-device!) ─────────────────
+            // ── Upload to Firebase Storage (cross-device!) ──────────────────
             let audioURL = null;
             if (window.currentUser && window.firebaseReady) {
                 try {
                     const filePath = `recordings/${window.currentUser.uid}/${recordingId}.wav`;
                     audioURL = await FirebaseREST.uploadAudio(filePath, audioBlob);
-                    console.log('✅ Audio uploaded to Cloudinary');
+                    console.log('✅ Audio uploaded to Firebase Storage');
                 } catch (error) {
-                    console.error('❌ Cloudinary upload failed, falling back to IndexedDB:', error);
+                    console.error('❌ Firebase Storage upload failed, falling back to IndexedDB:', error);
                 }
             }
 
@@ -12562,7 +12603,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
                 id: recordingId,
                 question: question || 'Sans question',
                 hasAudio: true,
-                audioURL: audioURL || null,   // Cloudinary URL (cross-device, permanent)
+                audioURL: audioURL || null,   // Firebase Storage URL (cross-device)
                 hasLocalAudio: !audioURL,     // true = stored in IndexedDB only
                 duration: 0,
                 note: document.getElementById('recording-note').value.trim() || '',
@@ -12583,7 +12624,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
             currentRecording = null;
 
             renderRecordings();
-            alert(audioURL ? '✅ Enregistrement sauvegardé sur Cloudinary ☁️' : '✅ Enregistrement sauvegardé localement');
+            alert(audioURL ? '✅ Enregistrement sauvegardé sur Firebase ☁️' : '✅ Enregistrement sauvegardé localement');
         });
 
         // Audio upload handler
@@ -12705,7 +12746,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
                 const rec = recordings.find(r => Number(r.id) === numericId);
 
                 if (rec && rec.audioURL) {
-                    // ✅ Cloudinary URL — works on any device!
+                    // ✅ Firebase Storage — works on any device!
                     playerDiv.innerHTML = `
                         <audio controls style="width: 100%;" autoplay>
                             <source src="${rec.audioURL}" type="audio/wav">
@@ -12786,13 +12827,13 @@ Ils seront préservés lors de l'affichage !"></textarea>
                 const rec = recordings.find(r => Number(r.id) === numericId);
 
                 if (rec) {
-                    // Delete from Cloudinary if it was uploaded there
+                    // Delete from Firebase Storage if it was uploaded there
                     if (rec.audioURL && window.currentUser) {
                         try {
                             const filePath = `recordings/${window.currentUser.uid}/${numericId}.wav`;
                             await FirebaseREST.deleteAudio(filePath);
                         } catch (error) {
-                            console.warn('Could not delete from Cloudinary:', error);
+                            console.warn('Could not delete from Firebase Storage:', error);
                         }
                     }
                     // Also clean up IndexedDB just in case
@@ -14320,6 +14361,21 @@ Ils seront préservés lors de l'affichage !"></textarea>
             if (addWordBtn) {
                 addWordBtn.addEventListener('click', function() {
                     openModal('word-modal');
+                });
+            }
+
+            // Update dictionary links when user types in the word input field
+            const wordInput = document.getElementById('word-input');
+            if (wordInput) {
+                wordInput.addEventListener('input', function() {
+                    const word = this.value.trim().toLowerCase();
+                    if (word) {
+                        document.getElementById('main-link-wordreference').href = `https://www.wordreference.com/fren/${encodeURIComponent(word)}`;
+                        document.getElementById('main-link-reverso').href = `https://context.reverso.net/translation/french-english/${encodeURIComponent(word)}`;
+                        document.getElementById('main-link-collins').href = `https://www.collinsdictionary.com/dictionary/french-english/${encodeURIComponent(word)}`;
+                        document.getElementById('main-link-larousse').href = `https://www.larousse.fr/dictionnaires/francais/${encodeURIComponent(word)}`;
+                        document.getElementById('main-link-youglish').href = `https://youglish.com/pronounce/${encodeURIComponent(word)}/french`;
+                    }
                 });
             }
 
@@ -16937,7 +16993,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
         </div>
         
         <div style="margin: 1rem 0; padding: 1rem; background: var(--whisper); border-radius: 8px;">
-            <div style="font-size: 0.9rem; font-weight: 500; margin-bottom: 0.5rem; color: var(--text-soft);">📚 Dictionnaires:</div>
+            <div style="font-size: 0.9rem; font-weight: 500; margin-bottom: 0.5rem; color: var(--text-soft);">📚 Dictionnaires & Prononciation:</div>
             <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
                 <a id="link-wordreference" href="#" target="_blank" class="btn btn-secondary" style="font-size: 0.85rem; padding: 0.4rem 0.8rem; text-decoration: none;">
                     WordReference
@@ -16950,6 +17006,9 @@ Ils seront préservés lors de l'affichage !"></textarea>
                 </a>
                 <a id="link-larousse" href="#" target="_blank" class="btn btn-secondary" style="font-size: 0.85rem; padding: 0.4rem 0.8rem; text-decoration: none;">
                     Larousse
+                </a>
+                <a id="link-youglish" href="#" target="_blank" class="btn btn-secondary" style="font-size: 0.85rem; padding: 0.4rem 0.8rem; text-decoration: none; background: var(--rose-pale); color: var(--burgundy);">
+                    YouGlish
                 </a>
             </div>
         </div>
@@ -17193,6 +17252,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
             document.getElementById('link-reverso').href = `https://context.reverso.net/translation/french-english/${encodeURIComponent(cleanWord)}`;
             document.getElementById('link-collins').href = `https://www.collinsdictionary.com/dictionary/french-english/${encodeURIComponent(cleanWord)}`;
             document.getElementById('link-larousse').href = `https://www.larousse.fr/dictionnaires/francais/${encodeURIComponent(cleanWord)}`;
+            document.getElementById('link-youglish').href = `https://youglish.com/pronounce/${encodeURIComponent(cleanWord)}/french`;
         }
         
         function closeWordAnalysisPopup() {
@@ -17252,7 +17312,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
             // Add to vocabulary (Le Jardin)
             const newWord = {
                 id: Date.now(),
-                word: wordText,
+                french: wordText,  // FIXED: Changed from 'word' to 'french' to match the rendering template
                 meaning: meaning,
                 context: context || '', // Save the context!
                 article: '',
