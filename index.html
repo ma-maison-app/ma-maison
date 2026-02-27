@@ -8796,12 +8796,24 @@ Ils seront préservés lors de l'affichage !"></textarea>
                     totalActions: 0
                 };
                 savePresenceData();
+            } else if (!presenceData[today].actions) {
+                // Old format — migrate it
+                const d = presenceData[today];
+                presenceData[today].actions = {
+                    writing: !!(d.addedWriting),
+                    speaking: !!(d.addedRecording),
+                    listening: !!(d.listenedAudio),
+                    reading: !!(d.addedReading),
+                    new_word: !!(d.addedVocab)
+                };
+                presenceData[today].totalActions = Object.values(presenceData[today].actions).filter(Boolean).length;
             }
             return presenceData[today];
         }
 
         function logAction(actionType) {
             const today = initPresenceForToday();
+            if (!today.actions) today.actions = { writing: false, speaking: false, listening: false, reading: false, new_word: false };
             if (!today.actions[actionType]) {
                 today.actions[actionType] = true;
                 today.totalActions = Object.values(today.actions).filter(Boolean).length;
