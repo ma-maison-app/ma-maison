@@ -15682,7 +15682,26 @@ Ils seront préservés lors de l'affichage !"></textarea>
                     }
                     
                     if (data.presenceData) {
-                        presenceData = data.presenceData;
+                        // Migrate old format (addedVocab etc) to new format (actions object)
+                        presenceData = {};
+                        for (const [dateStr, dayVal] of Object.entries(data.presenceData)) {
+                            if (dayVal && dayVal.actions) {
+                                presenceData[dateStr] = dayVal;
+                            } else if (dayVal) {
+                                const actions = {
+                                    writing: !!(dayVal.addedWriting),
+                                    speaking: !!(dayVal.addedRecording),
+                                    listening: !!(dayVal.listenedAudio),
+                                    reading: !!(dayVal.addedReading),
+                                    new_word: !!(dayVal.addedVocab)
+                                };
+                                presenceData[dateStr] = {
+                                    date: dateStr,
+                                    actions: actions,
+                                    totalActions: Object.values(actions).filter(Boolean).length
+                                };
+                            }
+                        }
                         console.log('✅ Loaded', Object.keys(presenceData).length, 'days of presence data');
                     }
                     
