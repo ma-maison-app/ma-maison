@@ -9415,42 +9415,66 @@ Ils seront préservés lors de l'affichage !"></textarea>
 
                 const reader = new FileReader();
                 reader.onload = (event) => {
+                    let data;
                     try {
-                        const data = JSON.parse(event.target.result);
-                        
-                        if (confirm('Importer ces données ? Cela remplacera tout ce que tu as actuellement.')) {
-                            vocabulary = data.vocabulary || [];
-                            writings = data.writings || [];
-                            readingList = data.readingList || [];
-                            listeningList = data.listeningList || [];
-                            recordings = data.recordings || [];
-                            resourcesList = data.resourcesList || [];
-                            notes = data.notes || [];
-                            presenceData = data.presenceData || {};
-                            readingPassages = data.readingPassages || [];
-                            mistakeCorrections = data.mistakeCorrections || [];
-                            window.transcriptWordStatus = data.transcriptWordStatus || {};
-                            readingTranscripts = data.readingTranscripts || [];
-                            listeningTranscripts = data.listeningTranscripts || [];
-                            listeningPlaybackPositions = data.listeningPlaybackPositions || {};
-                            
-                            // Sync all imported data to Firebase
-                            if (window.syncToFirebase) window.syncToFirebase();
-                            
-                            renderGarden();
-                            populateJardinFilters(); // NEW
-                            renderReadingList();
-                            renderListeningList();
-                            renderRecordings();
-                            renderWritingsArchive();
-                            renderResourcesList();
-                            renderNotes();
-                            
-                            alert('Données importées avec succès ✓');
-                        }
+                        data = JSON.parse(event.target.result);
                     } catch (err) {
-                        alert('Erreur : ' + err.message);
+                        alert('Erreur : fichier invalide');
                         console.error(err);
+                        return;
+                    }
+                    
+                    if (confirm('Importer ces données ? Cela remplacera tout ce que tu as actuellement.')) {
+                        vocabulary = data.vocabulary || [];
+                        writings = data.writings || [];
+                        readingList = data.readingList || [];
+                        listeningList = data.listeningList || [];
+                        recordings = data.recordings || [];
+                        resourcesList = data.resourcesList || [];
+                        notes = data.notes || [];
+                        readingPassages = data.readingPassages || [];
+                        mistakeCorrections = data.mistakeCorrections || [];
+                        window.transcriptWordStatus = data.transcriptWordStatus || {};
+                        readingTranscripts = data.readingTranscripts || [];
+                        listeningTranscripts = data.listeningTranscripts || [];
+                        listeningPlaybackPositions = data.listeningPlaybackPositions || {};
+                        
+                        // Migrate presenceData from old format to new format
+                        const rawPresence = data.presenceData || {};
+                        presenceData = {};
+                        for (const [dateStr, dayVal] of Object.entries(rawPresence)) {
+                            if (dayVal && dayVal.actions) {
+                                presenceData[dateStr] = dayVal;
+                            } else if (dayVal) {
+                                const actions = {
+                                    writing: !!(dayVal.addedWriting),
+                                    speaking: !!(dayVal.addedRecording),
+                                    listening: !!(dayVal.listenedAudio),
+                                    reading: !!(dayVal.addedReading),
+                                    new_word: !!(dayVal.addedVocab)
+                                };
+                                presenceData[dateStr] = {
+                                    date: dateStr,
+                                    actions: actions,
+                                    totalActions: Object.values(actions).filter(Boolean).length
+                                };
+                            }
+                        }
+                        
+                        // Sync all imported data to Firebase
+                        if (window.syncToFirebase) window.syncToFirebase();
+                        
+                        try { renderGarden(); } catch(e) { console.error('renderGarden error:', e); }
+                        try { populateJardinFilters(); } catch(e) { console.error('populateJardinFilters error:', e); }
+                        try { renderReadingList(); } catch(e) { console.error('renderReadingList error:', e); }
+                        try { renderListeningList(); } catch(e) { console.error('renderListeningList error:', e); }
+                        try { renderRecordings(); } catch(e) { console.error('renderRecordings error:', e); }
+                        try { renderWritingsArchive(); } catch(e) { console.error('renderWritingsArchive error:', e); }
+                        try { renderResourcesList(); } catch(e) { console.error('renderResourcesList error:', e); }
+                        try { renderNotes(); } catch(e) { console.error('renderNotes error:', e); }
+                        try { renderPresenceCalendar(); } catch(e) { console.error('renderPresenceCalendar error:', e); }
+                        
+                        alert('Données importées avec succès ✓');
                     }
                 };
                 reader.readAsText(file);
