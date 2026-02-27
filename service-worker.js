@@ -1,4 +1,5 @@
-const CACHE_NAME = 'ma-maison-v12-cloudinary';
+
+const CACHE_NAME = 'ma-maison-v13';
 const urlsToCache = [
   './',
   'https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&family=Work+Sans:wght@300;400;500&family=Allura&display=swap',
@@ -6,9 +7,8 @@ const urlsToCache = [
   'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'
 ];
 
-// Install event - cache resources
 self.addEventListener('install', (event) => {
-  console.log('Service Worker: Installing v11 (Cloudinary)...');
+  console.log('Service Worker: Installing v13...');
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
@@ -32,9 +32,8 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
-  console.log('Service Worker: Activating v11...');
+  console.log('Service Worker: Activating v13...');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
@@ -46,33 +45,29 @@ self.addEventListener('activate', (event) => {
         })
       );
     }).then(() => {
-      console.log('Service Worker: v11 activated, claiming clients');
+      console.log('Service Worker: v13 activated, claiming clients');
       return self.clients.claim();
     })
   );
 });
 
-// Fetch event - serve from cache, fallback to network
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // ⚠️ CRITICAL: Skip ALL Firebase + Cloudinary requests - never cache them!
   if (url.hostname.includes('googleapis.com') || 
       url.hostname.includes('firebaseio.com') ||
       url.hostname.includes('firestore.googleapis.com') ||
       url.hostname.includes('identitytoolkit.googleapis.com') ||
-      url.hostname.includes('cloudinary.com') ||        // ← audio uploads/playback
-      url.hostname.includes('res.cloudinary.com')) {    // ← Cloudinary media CDN
+      url.hostname.includes('cloudinary.com') ||
+      url.hostname.includes('res.cloudinary.com')) {
     return;
   }
 
-  // ⚠️ CRITICAL: Only cache GET requests
   if (request.method !== 'GET') {
     return;
   }
 
-  // 🔥 HTML files: ALWAYS fetch from network first (so updates show immediately!)
   if (url.pathname.endsWith('.html') || url.pathname === '/' || url.pathname === '') {
     event.respondWith(
       fetch(request)
@@ -129,14 +124,12 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// Background sync for Firebase data (when online)
 self.addEventListener('sync', (event) => {
   if (event.tag === 'sync-firebase') {
     event.waitUntil(Promise.resolve());
   }
 });
 
-// Push notifications
 self.addEventListener('push', (event) => {
   const options = {
     body: event.data ? event.data.text() : 'Notification from Ma Maison',
@@ -150,7 +143,6 @@ self.addEventListener('push', (event) => {
   );
 });
 
-// Notification click handler
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   event.waitUntil(
