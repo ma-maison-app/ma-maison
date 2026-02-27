@@ -691,6 +691,28 @@ const firebaseConfig = {
             border-bottom-color: rgba(232, 220, 200, 0.1);
         }
 
+        body.dark-mode #timer-banner {
+            background: rgba(22, 27, 34, 0.92) !important;
+            border-color: rgba(244, 213, 141, 0.2) !important;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.35), 0 1px 4px rgba(0,0,0,0.2) !important;
+        }
+        body.dark-mode #timer-banner #banner-countdown {
+            color: var(--navy) !important;
+        }
+        body.dark-mode #timer-banner #banner-pause-btn {
+            color: var(--navy) !important;
+            background: rgba(232,220,200,0.08) !important;
+        }
+
+        body.dark-mode #timer-peek {
+            background: rgba(22, 27, 34, 0.92) !important;
+            border-color: rgba(244, 213, 141, 0.2) !important;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.35) !important;
+        }
+        body.dark-mode #timer-peek #peek-countdown {
+            color: var(--navy) !important;
+        }
+
         body.dark-mode .word-card,
         body.dark-mode .entrance-card,
         body.dark-mode .reading-card,
@@ -5152,6 +5174,23 @@ const firebaseConfig = {
             color: var(--gold);
         }
 
+        .transcript-plain-para {
+            margin: 0 0 1.3em 0;
+            line-height: 1.95;
+            color: var(--navy);
+            font-size: 1rem;
+            font-family: 'Cormorant Garamond', serif;
+            font-weight: 400;
+        }
+
+        body.dark-mode .transcript-plain-para {
+            color: var(--navy);
+        }
+
+        .transcript-plain-para:last-child {
+            margin-bottom: 0;
+        }
+
         .transcript-text {
             color: var(--text);
         }
@@ -5172,7 +5211,31 @@ const firebaseConfig = {
             background: rgba(190, 31, 46, 0.1);
         }
         
-        .clickable-transcript-word.word-selected {
+        .clickable-transcript-word.word-shadowing-active {
+            border-bottom: 2px solid var(--gold);
+            color: var(--navy);
+            font-weight: 500;
+        }
+
+        body.dark-mode .clickable-transcript-word.word-shadowing-active {
+            border-bottom-color: var(--gold);
+        }
+
+        #shadowing-toggle.active {
+            background: var(--gold-pale) !important;
+            border-color: var(--gold) !important;
+            color: var(--navy) !important;
+        }
+
+        .transcript-line.shadowing-done {
+            opacity: 0.45;
+        }
+
+        .transcript-line.shadowing-current {
+            background: rgba(201, 168, 97, 0.08);
+            border-radius: 6px;
+            padding-left: 4px;
+        }
             background: rgba(190, 31, 46, 0.25);
             border-bottom: 2px solid var(--crimson);
         }
@@ -5830,6 +5893,36 @@ const firebaseConfig = {
         <button class="nav-link" data-room="notes">Le Cabinet de Travail</button>
         <button class="nav-link" data-room="ressources">La Réserve</button>
     </nav>
+
+    <!-- Timer Banner -->
+    <div id="timer-banner" style="display:none; position:fixed; top:1.1rem; left:50%; transform:translateX(-50%); z-index:1000; align-items:center; gap:0.9rem; background:rgba(251,249,244,0.88); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); border:1px solid rgba(201,168,97,0.25); border-radius:100px; padding:0.5rem 0.9rem 0.5rem 1.2rem; box-shadow:0 4px 24px rgba(27,43,58,0.1), 0 1px 4px rgba(27,43,58,0.06); font-family:'Work Sans',sans-serif; transition: opacity 0.3s;">
+        <span style="font-size:0.7rem; color:var(--gold); letter-spacing:0.12em; text-transform:uppercase; font-weight:500; opacity:0.9;">⏱</span>
+        <span id="banner-countdown" style="font-family:'Cormorant Garamond',serif; font-size:1.25rem; font-weight:500; color:var(--navy); letter-spacing:0.04em; min-width:3.5rem; text-align:center;">25:00</span>
+        <div id="banner-controls" style="display:flex; gap:0.35rem; align-items:center;">
+            <button id="banner-pause-btn" onclick="bannerTogglePause()" style="background:var(--whisper); border:none; color:var(--navy); padding:0.3rem 0.7rem; border-radius:100px; cursor:pointer; font-size:0.75rem; font-family:'Work Sans',sans-serif; font-weight:400; opacity:0.75; transition:opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.75'">Pause</button>
+            <button onclick="bannerHide()" title="Masquer" style="background:none; border:none; color:var(--navy); padding:0.3rem 0.5rem; border-radius:100px; cursor:pointer; font-size:0.8rem; opacity:0.4; transition:opacity 0.2s; line-height:1;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='0.4'">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+            <button onclick="bannerReset()" title="Arrêter" style="background:none; border:none; color:var(--navy); padding:0.3rem 0.5rem; border-radius:100px; cursor:pointer; font-size:0.8rem; opacity:0.4; transition:opacity 0.2s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='0.4'">✕</button>
+        </div>
+    </div>
+
+    <!-- Timer hidden peek button -->
+    <div id="timer-peek" style="display:none; position:fixed; top:1.1rem; left:50%; transform:translateX(-50%); z-index:1000; align-items:center; gap:0.6rem; background:rgba(251,249,244,0.88); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); border:1px solid rgba(201,168,97,0.25); border-radius:100px; padding:0.4rem 0.9rem; box-shadow:0 4px 24px rgba(27,43,58,0.08); font-family:'Work Sans',sans-serif; cursor:pointer;" onclick="bannerShow()" title="Afficher le minuteur">
+        <span style="font-size:0.7rem; color:var(--gold);">⏱</span>
+        <span id="peek-countdown" style="font-family:'Cormorant Garamond',serif; font-size:1rem; color:var(--navy); opacity:0.6; letter-spacing:0.04em;">--:--</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.35; color:var(--navy)"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+    </div>
+
+    <!-- Timer Done Modal -->
+    <div id="timer-done-modal" style="display:none; position:fixed; inset:0; z-index:10000; background:rgba(0,0,0,0.5); align-items:center; justify-content:center;">
+        <div style="background:var(--cream); border-radius:20px; padding:2.5rem; max-width:380px; text-align:center; box-shadow:0 20px 60px rgba(0,0,0,0.3); margin:1rem;">
+            <div id="timer-done-emoji" style="font-size:3rem; margin-bottom:1rem;">🌸</div>
+            <h2 style="font-family:'Cormorant Garamond',serif; font-size:1.8rem; color:var(--navy); margin-bottom:0.75rem;">Temps écoulé !</h2>
+            <p id="timer-done-msg" style="color:var(--text-soft); font-size:1rem; line-height:1.6; margin-bottom:1.5rem;"></p>
+            <button onclick="closeDoneModal()" style="background:var(--navy); color:white; border:none; padding:0.75rem 2rem; border-radius:30px; cursor:pointer; font-family:'Work Sans',sans-serif; font-size:0.95rem;">Merci 💛</button>
+        </div>
+    </div>
 
     <!-- Main -->
     <main class="main">
@@ -7529,7 +7622,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
                     <h3 style="font-family: 'Cormorant Garamond', serif; font-size: 1.3rem; margin-bottom: 0.5rem; color: var(--navy);">
                         Transcription interactive
                     </h3>
-                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap;">
                         <p style="font-size: 0.85rem; color: var(--text-soft); margin: 0;">
                             💡 Clique un mot pour l'analyser
                         </p>
@@ -7539,8 +7632,15 @@ Ils seront préservés lors de l'affichage !"></textarea>
                                 <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
                             </svg>
                         </button>
+                        <button id="shadowing-toggle" onclick="toggleShadowingMode()" title="Mode répétition" style="background: none; border: 1px solid rgba(42,37,32,0.12); border-radius: 20px; padding: 0.25rem 0.7rem; font-size: 0.75rem; font-family: 'Work Sans', sans-serif; color: var(--text-soft); cursor: pointer; display: flex; align-items: center; gap: 0.3rem; transition: all 0.2s;">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+                            Répéter
+                        </button>
                         <span id="multi-select-hint" style="font-size: 0.8rem; color: var(--rose); font-weight: 500; display: none;">
                             📝 Sélectionne plusieurs mots
+                        </span>
+                        <span id="shadowing-hint" style="font-size: 0.8rem; color: var(--gold); font-weight: 500; display: none;">
+                            🎤 Répète après chaque ligne
                         </span>
                     </div>
                     <div id="transcript-content" class="transcript-lines">
@@ -8270,6 +8370,19 @@ Ils seront préservés lors de l'affichage !"></textarea>
             const syncIndicator = document.getElementById('sync-indicator');
             if (syncIndicator) syncIndicator.style.opacity = '1';
             
+            // ✅ SAFETY GUARD: Never overwrite Firebase with empty data.
+            // This prevents race conditions (saving before load finishes) from wiping everything.
+            const _totalItems = (vocabulary?.length || 0) + (readingList?.length || 0) +
+                                (writings?.length || 0) + (listeningList?.length || 0) +
+                                (recordings?.length || 0) + (notes?.length || 0) +
+                                (readingPassages?.length || 0) + (resourcesList?.length || 0) +
+                                Object.keys(presenceData || {}).length;
+            if (_totalItems === 0 && !window._allowEmptySave) {
+                console.warn('⚠️ SAFETY GUARD: Refusing to save - all data is empty. Possible race condition or accidental reset. Set window._allowEmptySave=true to override.');
+                if (syncIndicator) syncIndicator.style.opacity = '0';
+                return;
+            }
+            
             try {
                 await setDoc(doc(window.firebaseDB, 'users', window.currentUser.uid), {
                     vocabulary,
@@ -8285,9 +8398,9 @@ Ils seront préservés lors de l'affichage !"></textarea>
                     presenceData,
                     mistakeCorrections: mistakeCorrections || [],
                     transcriptWordStatus: window.transcriptWordStatus || {},
-                    listeningPlaybackPositions: listeningPlaybackPositions || {},  // Save playback positions
+                    listeningPlaybackPositions: listeningPlaybackPositions || {},
                     lastUpdated: new Date().toISOString()
-                });
+                }, { merge: true }); // ✅ merge:true means Firebase merges fields instead of replacing the whole document
                 
                 console.log('✅ Data saved to Firebase successfully!');
                 
@@ -9262,6 +9375,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
             
             document.getElementById('export-data').addEventListener('click', () => {
                 console.log('Export clicked!');
+
                 const data = {
                     vocabulary,
                     writings,
@@ -9270,6 +9384,13 @@ Ils seront préservés lors de l'affichage !"></textarea>
                     recordings,
                     resourcesList,
                     notes,
+                    presenceData,
+                    readingPassages: readingPassages || [],
+                    mistakeCorrections: mistakeCorrections || [],
+                    transcriptWordStatus: window.transcriptWordStatus || {},
+                    readingTranscripts: readingTranscripts || [],
+                    listeningTranscripts: listeningTranscripts || [],
+                    listeningPlaybackPositions: listeningPlaybackPositions || {},
                     exportDate: new Date().toISOString()
                 };
 
@@ -9305,6 +9426,13 @@ Ils seront préservés lors de l'affichage !"></textarea>
                             recordings = data.recordings || [];
                             resourcesList = data.resourcesList || [];
                             notes = data.notes || [];
+                            presenceData = data.presenceData || {};
+                            readingPassages = data.readingPassages || [];
+                            mistakeCorrections = data.mistakeCorrections || [];
+                            window.transcriptWordStatus = data.transcriptWordStatus || {};
+                            readingTranscripts = data.readingTranscripts || [];
+                            listeningTranscripts = data.listeningTranscripts || [];
+                            listeningPlaybackPositions = data.listeningPlaybackPositions || {};
                             
                             // Sync all imported data to Firebase
                             if (window.syncToFirebase) window.syncToFirebase();
@@ -9336,7 +9464,8 @@ Ils seront préservés lors de l'affichage !"></textarea>
 
             document.getElementById('reset-data').addEventListener('click', async () => {
                 if (confirm('Vraiment tout effacer ? Cette action est irréversible.')) {
-                if (confirm('Dernière confirmation — tu es sûr ?')) {
+                const typed = prompt('⚠️ Tape EFFACER en majuscules pour confirmer la suppression de toutes tes données :');
+                if (typed === 'EFFACER') {
                     // Clear all data arrays
                     vocabulary = [];
                     writings = [];
@@ -9356,8 +9485,11 @@ Ils seront préservés lors de l'affichage !"></textarea>
                     if (musicVolume) localStorage.setItem('musicVolume', musicVolume);
                     
                     // Sync empty data to Firebase (only if logged in)
+                    // ✅ Set flag so the safety guard allows this intentional empty save
                     if (window.currentUser) {
-                        await saveDataToFirebase(); // Immediate sync, not debounced
+                        window._allowEmptySave = true;
+                        await saveDataToFirebase();
+                        window._allowEmptySave = false;
                     }
                     
                     renderGarden();
@@ -9368,8 +9500,10 @@ Ils seront préservés lors de l'affichage !"></textarea>
                     renderWritingsArchive();
                     renderResourcesList();
                     alert('Tout a été effacé. Tu peux recommencer.');
+                } else {
+                    alert('Suppression annulée.');
                 }
-            }
+                }
             });
         }
 
@@ -9377,14 +9511,165 @@ Ils seront préservés lors de l'affichage !"></textarea>
         // STUDY TIMER
         // ============================================
         let timerInterval = null;
-        let timerSeconds = 25 * 60; // Default 25 minutes
+        let timerSeconds = 25 * 60;
         let timerRunning = false;
+        let timerStartedAt = null; // epoch ms when last started
+        let timerSecondsAtStart = 25 * 60; // seconds remaining when last started
+
+        const TIMER_ENCOURAGING = [
+            { emoji: '🌸', msg: 'Belle session ! Chaque minute passée avec le français te rapproche de la fluidité. Prends une vraie pause — tu l\'as mérité.' },
+            { emoji: '☕', msg: 'C\'est fait ! Prends un café, étire-toi, respire. Ton cerveau vient d\'absorber quelque chose de précieux.' },
+            { emoji: '✨', msg: 'Magnifique concentration. Le français s\'installe doucement, session après session. Tu construis quelque chose de solide.' },
+            { emoji: '🎉', msg: 'Bravo ! La régularité est le secret des langues. Tu viens de prouver que tu es régulier.' },
+            { emoji: '💛', msg: 'C\'est terminé pour cette session. Laisse ton esprit se reposer — c\'est pendant la pause que le cerveau consolide.' },
+            { emoji: '🌿', msg: 'Une session de plus dans les livres. Petit à petit, l\'oiseau fait son nid… et toi, tu fais ton français.' },
+            { emoji: '🏡', msg: 'Tu es chez toi dans cette langue. Chaque session, la maison devient un peu plus familière.' },
+        ];
+
+        function _timerFormat(s) {
+            const m = Math.floor(s / 60);
+            const sec = s % 60;
+            return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+        }
 
         function updateTimerDisplay() {
-            const minutes = Math.floor(timerSeconds / 60);
-            const seconds = timerSeconds % 60;
-            document.getElementById('timer-display').textContent = 
-                `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            const el = document.getElementById('timer-display');
+            if (el) el.textContent = _timerFormat(timerSeconds);
+            const banner = document.getElementById('banner-countdown');
+            if (banner) banner.textContent = _timerFormat(timerSeconds);
+            const peek = document.getElementById('peek-countdown');
+            if (peek) peek.textContent = _timerFormat(timerSeconds);
+        }
+
+        function _saveTimerState() {
+            localStorage.setItem('timerState', JSON.stringify({
+                timerSeconds,
+                timerRunning,
+                timerStartedAt,
+                timerSecondsAtStart
+            }));
+        }
+
+        function _loadTimerState() {
+            try {
+                const raw = localStorage.getItem('timerState');
+                if (!raw) return;
+                const state = JSON.parse(raw);
+                // If timer was running, calculate how many seconds have elapsed
+                if (state.timerRunning && state.timerStartedAt) {
+                    const elapsed = Math.floor((Date.now() - state.timerStartedAt) / 1000);
+                    timerSeconds = Math.max(0, state.timerSecondsAtStart - elapsed);
+                    timerSecondsAtStart = state.timerSecondsAtStart;
+                    timerStartedAt = state.timerStartedAt;
+                    if (timerSeconds > 0) {
+                        timerRunning = true; // will be resumed in setupTimer
+                    } else {
+                        timerRunning = false;
+                        timerSeconds = 0;
+                    }
+                } else {
+                    timerSeconds = state.timerSeconds || 25 * 60;
+                    timerRunning = false;
+                }
+            } catch(e) {}
+        }
+
+        function showTimerBanner() {
+            const banner = document.getElementById('timer-banner');
+            const peek = document.getElementById('timer-peek');
+            if (banner) banner.style.display = 'flex';
+            if (peek) peek.style.display = 'none';
+        }
+
+        function hideTimerBanner() {
+            const banner = document.getElementById('timer-banner');
+            const peek = document.getElementById('timer-peek');
+            if (banner) banner.style.display = 'none';
+            if (peek) peek.style.display = 'none';
+        }
+
+        window.bannerHide = function() {
+            const banner = document.getElementById('timer-banner');
+            const peek = document.getElementById('timer-peek');
+            if (banner) banner.style.display = 'none';
+            if (peek) peek.style.display = 'flex';
+        };
+
+        window.bannerShow = function() {
+            const banner = document.getElementById('timer-banner');
+            const peek = document.getElementById('timer-peek');
+            if (banner) banner.style.display = 'flex';
+            if (peek) peek.style.display = 'none';
+        };
+
+        function showDoneModal() {
+            const pick = TIMER_ENCOURAGING[Math.floor(Math.random() * TIMER_ENCOURAGING.length)];
+            document.getElementById('timer-done-emoji').textContent = pick.emoji;
+            document.getElementById('timer-done-msg').textContent = pick.msg;
+            const modal = document.getElementById('timer-done-modal');
+            modal.style.display = 'flex';
+        }
+
+        window.closeDoneModal = function() {
+            document.getElementById('timer-done-modal').style.display = 'none';
+        };
+
+        window.bannerTogglePause = function() {
+            const btn = document.getElementById('banner-pause-btn');
+            const startBtn = document.getElementById('timer-start');
+            if (timerRunning) {
+                timerRunning = false;
+                clearInterval(timerInterval);
+                _saveTimerState();
+                if (btn) btn.textContent = 'Reprendre';
+                if (startBtn) startBtn.textContent = 'Reprendre';
+            } else {
+                timerRunning = true;
+                timerStartedAt = Date.now();
+                timerSecondsAtStart = timerSeconds;
+                _saveTimerState();
+                if (btn) btn.textContent = 'Pause';
+                if (startBtn) startBtn.textContent = 'Pause';
+                timerInterval = setInterval(_timerTick, 1000);
+            }
+        };
+
+        window.bannerReset = function() {
+            clearInterval(timerInterval);
+            timerRunning = false;
+            timerStartedAt = null;
+            const activePreset = document.querySelector('.timer-preset.active');
+            const minutes = activePreset ? parseInt(activePreset.dataset.minutes) : 25;
+            timerSeconds = minutes * 60;
+            timerSecondsAtStart = timerSeconds;
+            updateTimerDisplay();
+            hideTimerBanner();
+            localStorage.removeItem('timerState');
+            const startBtn = document.getElementById('timer-start');
+            const resetBtn = document.getElementById('timer-reset');
+            if (startBtn) startBtn.textContent = 'Commencer';
+            if (resetBtn) resetBtn.style.display = 'none';
+        };
+
+        function _timerTick() {
+            timerSeconds--;
+            updateTimerDisplay();
+            _saveTimerState();
+            if (timerSeconds <= 0) {
+                clearInterval(timerInterval);
+                timerRunning = false;
+                timerStartedAt = null;
+                localStorage.removeItem('timerState');
+                hideTimerBanner();
+                const startBtn = document.getElementById('timer-start');
+                const resetBtn = document.getElementById('timer-reset');
+                if (startBtn) startBtn.textContent = 'Commencer';
+                if (resetBtn) resetBtn.style.display = 'none';
+                showDoneModal();
+                if ('Notification' in window && Notification.permission === 'granted') {
+                    new Notification('Minuteur terminé ! 🌸', { body: 'Temps d\'étude terminé. Prends une pause !' });
+                }
+            }
         }
 
         function setupTimer() {
@@ -9395,16 +9680,28 @@ Ils seront préservés lors de l'affichage !"></textarea>
 
             if (!timerDisplay || !startBtn || !resetBtn) return;
 
+            // Restore state from localStorage (handles page navigation/refresh)
+            _loadTimerState();
+            updateTimerDisplay();
+
+            // If timer was running when page loaded, resume it and show banner
+            if (timerRunning && timerSeconds > 0) {
+                showTimerBanner();
+                startBtn.textContent = 'Pause';
+                resetBtn.style.display = 'inline-block';
+                timerStartedAt = Date.now();
+                timerSecondsAtStart = timerSeconds;
+                timerInterval = setInterval(_timerTick, 1000);
+            }
+
             // Preset buttons
             presetBtns.forEach(btn => {
                 btn.addEventListener('click', () => {
-                    if (timerRunning) return; // Don't change during countdown
-                    
+                    if (timerRunning) return;
                     const minutes = parseInt(btn.dataset.minutes);
                     timerSeconds = minutes * 60;
+                    timerSecondsAtStart = timerSeconds;
                     updateTimerDisplay();
-                    
-                    // Update active state
                     presetBtns.forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
                 });
@@ -9413,52 +9710,29 @@ Ils seront préservés lors de l'affichage !"></textarea>
             // Start/Pause button
             startBtn.addEventListener('click', () => {
                 if (!timerRunning) {
-                    // Start timer
                     timerRunning = true;
+                    timerStartedAt = Date.now();
+                    timerSecondsAtStart = timerSeconds;
                     startBtn.textContent = 'Pause';
                     resetBtn.style.display = 'inline-block';
-                    
-                    timerInterval = setInterval(() => {
-                        timerSeconds--;
-                        updateTimerDisplay();
-                        
-                        if (timerSeconds <= 0) {
-                            clearInterval(timerInterval);
-                            timerRunning = false;
-                            startBtn.textContent = 'Commencer';
-                            
-                            // Play sound or notification
-                            if ('Notification' in window && Notification.permission === 'granted') {
-                                new Notification('Minuteur terminé !', {
-                                    body: 'Temps d\'étude terminé. Prends une pause ! ☕',
-                                    icon: '🎉'
-                                });
-                            } else {
-                                alert('Temps d\'étude terminé ! Prends une pause ☕');
-                            }
-                        }
-                    }, 1000);
+                    showTimerBanner();
+                    const bannerPauseBtn = document.getElementById('banner-pause-btn');
+                    if (bannerPauseBtn) bannerPauseBtn.textContent = 'Pause';
+                    _saveTimerState();
+                    timerInterval = setInterval(_timerTick, 1000);
                 } else {
-                    // Pause timer
                     timerRunning = false;
                     clearInterval(timerInterval);
                     startBtn.textContent = 'Reprendre';
+                    const bannerPauseBtn = document.getElementById('banner-pause-btn');
+                    if (bannerPauseBtn) bannerPauseBtn.textContent = 'Reprendre';
+                    _saveTimerState();
                 }
             });
 
             // Reset button
             resetBtn.addEventListener('click', () => {
-                clearInterval(timerInterval);
-                timerRunning = false;
-                
-                // Reset to active preset
-                const activePreset = document.querySelector('.timer-preset.active');
-                const minutes = activePreset ? parseInt(activePreset.dataset.minutes) : 25;
-                timerSeconds = minutes * 60;
-                
-                updateTimerDisplay();
-                startBtn.textContent = 'Commencer';
-                resetBtn.style.display = 'none';
+                window.bannerReset();
             });
 
             // Request notification permission
@@ -16094,54 +16368,64 @@ Peux-tu ajouter des timestamps réalistes au début de chaque ligne ? Format: [M
         window.parseTranscript = function(text) {
             if (!text || !text.trim()) return null;
 
-            const lines = text.split('\n').filter(l => l.trim());
+            const lines = text.split('\n');
             const parsed = [];
             let currentTime = null;
             let currentText = '';
+            let hasAnyTimestamp = false;
 
+            // First pass: check if there are ANY timestamps at all
+            for (const line of lines) {
+                if (line.match(/^\[?\d{1,2}:\d{2}/) || line.match(/^\d{1,2}:\d{2}.*-->/)) {
+                    hasAnyTimestamp = true;
+                    break;
+                }
+            }
+
+            // NO TIMESTAMPS: render as plain formatted text, preserving paragraphs
+            if (!hasAnyTimestamp) {
+                const paragraphs = text.split(/\n\s*\n/); // split on blank lines
+                paragraphs.forEach((para, i) => {
+                    const trimmed = para.trim();
+                    if (trimmed) {
+                        parsed.push({ time: null, text: trimmed.replace(/\n/g, ' ') });
+                    }
+                });
+                return parsed.length > 0 ? parsed : null;
+            }
+
+            // HAS TIMESTAMPS: parse as before
             for (let i = 0; i < lines.length; i++) {
                 const line = lines[i].trim();
-                
-                // Skip empty lines
                 if (!line) continue;
 
-                // Try to match various timestamp formats
-                // Format 1: [00:15] or [0:15]
+                // Format: [00:15] or 00:15 text
                 let match = line.match(/^\[?(\d{1,2}):(\d{2})(?::(\d{2}))?\]?\s*(.*)$/);
-                
-                // Format 2: 00:15:00 --> 00:18:00 (SRT format)
+
+                // SRT format: 00:15:00 --> 00:18:00
                 if (!match) {
                     match = line.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*-->\s*/);
                     if (match && i + 1 < lines.length) {
                         const nextLine = lines[i + 1].trim();
-                        currentTime = parseInt(match[1]) * 60 + parseInt(match[2]) + (match[3] ? parseInt(match[3]) : 0);
-                        currentText = nextLine;
-                        i++; // Skip the text line since we just read it
-                        parsed.push({ time: currentTime, text: currentText });
+                        currentTime = parseInt(match[1]) * 60 + parseInt(match[2]);
+                        if (nextLine && !nextLine.match(/^\d+$/)) {
+                            parsed.push({ time: currentTime, text: nextLine });
+                            i++;
+                        }
                         continue;
                     }
                 }
 
-                // Format 3: Plain timestamp at start
-                if (!match) {
-                    match = line.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s+(.+)$/);
-                }
-
                 if (match) {
-                    const minutes = parseInt(match[1]);
-                    const seconds = parseInt(match[2]);
-                    const milliseconds = match[3] ? parseInt(match[3]) : 0;
-                    currentTime = minutes * 60 + seconds + milliseconds;
+                    currentTime = parseInt(match[1]) * 60 + parseInt(match[2]);
                     currentText = match[4] || '';
-                    
                     if (currentText) {
                         parsed.push({ time: currentTime, text: currentText });
                     }
                 } else if (currentTime !== null && line && !line.match(/^\d+$/)) {
-                    // If we have a time but no new timestamp, this is continuation text
                     currentText += ' ' + line;
                     if (parsed.length > 0) {
-                        parsed[parsed.length - 1].text = currentText;
+                        parsed[parsed.length - 1].text = currentText.trim();
                     }
                 }
             }
@@ -16367,9 +16651,25 @@ Peux-tu ajouter des timestamps réalistes au début de chaque ligne ? Format: [M
                 }
             }
 
+            // Reset scroll so auto-scroll works fresh each session
+            userHasScrolled = false;
+            shadowingMode = false;
+            shadowingLastLineIndex = -1;
+            shadowingPausedForRepeat = false;
+            const shadowBtn = document.getElementById('shadowing-toggle');
+            const shadowHint = document.getElementById('shadowing-hint');
+            if (shadowBtn) shadowBtn.classList.remove('active');
+            if (shadowHint) shadowHint.style.display = 'none';
+
             // Load transcript
-            console.log('🔄 Calling loadTranscript with:', item.transcript);
             loadTranscript(item.transcript);
+
+            // Attach scroll detection to the real container
+            const transcriptContainer = document.getElementById('transcript-content');
+            if (transcriptContainer) {
+                transcriptContainer.addEventListener('scroll', () => { userHasScrolled = true; }, { passive: true, once: false });
+                transcriptContainer.addEventListener('touchstart', () => { userHasScrolled = true; }, { passive: true, once: false });
+            }
 
             // Start tracking time for highlighting
             startPlayerTracking();
@@ -16558,67 +16858,50 @@ Peux-tu ajouter des timestamps réalistes au début de chaque ligne ? Format: [M
 
         // Load and render transcript
         function loadTranscript(transcript) {
-            console.log('📝 loadTranscript called with:', transcript);
-            console.log('📝 Transcript type:', typeof transcript);
-            console.log('📝 Transcript length:', transcript ? transcript.length : 'null');
-            
-            // VISIBLE DEBUG FOR PHONE
-            if (!transcript) {
-                alert('DEBUG: transcript is null or undefined');
-            } else if (transcript.length === 0) {
-                alert('DEBUG: transcript exists but length is 0');
-            } else {
-                alert('DEBUG: transcript has ' + transcript.length + ' lines! First line: ' + JSON.stringify(transcript[0]));
-            }
-            
             const container = document.getElementById('transcript-content');
-            
+
             if (!transcript || transcript.length === 0) {
-                console.log('⚠️ No transcript available - showing placeholder');
                 container.innerHTML = '<p style="color: var(--text-soft); text-align: center; padding: 2rem;">Aucune transcription disponible</p>';
                 return;
             }
 
-            console.log('✅ Loading transcript with', transcript.length, 'lines');
-            
-            // Store known/unknown words status
-            if (!window.transcriptWordStatus) {
-                window.transcriptWordStatus = {};
-            }
-            
-            container.innerHTML = transcript.map((line, index) => {
-                // Split line into words and make each clickable
-                const words = line.text.split(/(\s+|[.,!?;:—])/);
-                const clickableText = words.map(token => {
-                    // Skip whitespace and punctuation
-                    if (!token.trim() || /^[.,!?;:—\s]+$/.test(token)) {
-                        return token;
-                    }
-                    
-                    const normalizedWord = token.toLowerCase().replace(/[.,!?;:—]/g, '');
-                    const status = window.transcriptWordStatus[normalizedWord] || '';
+            if (!window.transcriptWordStatus) window.transcriptWordStatus = {};
+
+            const isPlainText = transcript[0].time === null;
+
+            function makeClickableWords(text) {
+                return text.split(/([.,!?;:\u2014\u00ab\u00bb\u201c\u201d\u2018\u2019\s]+)/).map(token => {
+                    if (!token || /^[.,!?;:\u2014\u00ab\u00bb\u201c\u201d\u2018\u2019\s]+$/.test(token)) return token;
+                    const normalized = token.toLowerCase().replace(/[.,!?;:\u2014\u00ab\u00bb\u201c\u201d\u2018\u2019]/g, '');
+                    const status = window.transcriptWordStatus[normalized] || '';
                     const colorClass = status === 'unknown' ? 'word-unknown' : status === 'known' ? 'word-known' : '';
-                    
-                    return `<span class="clickable-transcript-word ${colorClass}" data-word="${normalizedWord}" data-original="${token}">${token}</span>`;
+                    return `<span class="clickable-transcript-word ${colorClass}" data-word="${normalized}" data-original="${token}">${token}</span>`;
                 }).join('');
-                
-                return `
-                    <div class="transcript-line" data-time="${line.time}">
+            }
+
+            if (isPlainText) {
+                container.innerHTML = transcript.map(para =>
+                    `<p class="transcript-plain-para">${makeClickableWords(para.text)}</p>`
+                ).join('');
+            } else {
+                container.innerHTML = transcript.map(line =>
+                    `<div class="transcript-line" data-time="${line.time}">
                         <span class="transcript-timestamp" onclick="jumpToTime(${line.time})">${formatTime(line.time)}</span>
-                        <span class="transcript-text">${clickableText}</span>
-                    </div>
-                `;
-            }).join('');
-            
-            // Attach click listeners to words
+                        <span class="transcript-text">${makeClickableWords(line.text)}</span>
+                    </div>`
+                ).join('');
+            }
+
             container.querySelectorAll('.clickable-transcript-word').forEach(wordEl => {
                 wordEl.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    const word = wordEl.dataset.word;
-                    const original = wordEl.dataset.original;
-                    handleWordClick(word, original, wordEl);
+                    handleWordClick(wordEl.dataset.word, wordEl.dataset.original, wordEl);
                 });
             });
+
+            // Fix auto-scroll: attach to actual container so manual scroll is detected
+            container.addEventListener('scroll', () => { userHasScrolled = true; }, { passive: true });
+            container.addEventListener('touchstart', () => { userHasScrolled = true; }, { passive: true });
         }
 
         window.jumpToTime = function(time) {
@@ -16702,36 +16985,118 @@ Peux-tu ajouter des timestamps réalistes au début de chaque ligne ? Format: [M
             
             // Auto-scroll to active line ONLY if user hasn't manually scrolled
             if (activeIndex >= 0 && lines[activeIndex] && !userHasScrolled) {
-                lines[activeIndex].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                lines[activeIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
         }
         
-        // Detect when user manually scrolls or touches the transcript
-        document.addEventListener('DOMContentLoaded', function() {
-            const transcriptContainer = document.querySelector('.clickable-transcript, #transcript-div');
-            if (transcriptContainer) {
-                // Reset userHasScrolled when audio starts playing
-                const resetScroll = () => {
-                    userHasScrolled = false;
-                };
-                
-                // Detect manual scrolling
-                transcriptContainer.addEventListener('touchstart', () => {
-                    userHasScrolled = true;
-                    clearTimeout(scrollTimeout);
-                    // Re-enable auto-scroll after 3 seconds of no interaction
-                    scrollTimeout = setTimeout(resetScroll, 3000);
+        // ─── SHADOWING MODE ───────────────────────────────────────────
+        let shadowingMode = false;
+        let shadowingPausedForRepeat = false;
+        let shadowingLastLineIndex = -1;
+
+        window.toggleShadowingMode = function() {
+            shadowingMode = !shadowingMode;
+            shadowingLastLineIndex = -1;
+            shadowingPausedForRepeat = false;
+
+            const btn = document.getElementById('shadowing-toggle');
+            const hint = document.getElementById('shadowing-hint');
+
+            if (shadowingMode) {
+                btn.classList.add('active');
+                if (hint) hint.style.display = 'inline';
+            } else {
+                btn.classList.remove('active');
+                if (hint) hint.style.display = 'none';
+                // Clear all shadowing word highlights
+                document.querySelectorAll('.word-shadowing-active').forEach(w => w.classList.remove('word-shadowing-active'));
+                document.querySelectorAll('.transcript-line').forEach(l => {
+                    l.classList.remove('shadowing-done', 'shadowing-current');
                 });
-                
-                transcriptContainer.addEventListener('scroll', (e) => {
-                    // Only mark as user scroll if it's not from our auto-scroll
-                    if (!e.isTrusted) return;
-                    userHasScrolled = true;
-                    clearTimeout(scrollTimeout);
-                    scrollTimeout = setTimeout(resetScroll, 3000);
-                }, { passive: true });
             }
-        });
+        };
+
+        function highlightShadowingWord(lineEl, currentTime, nextLineTime) {
+            const words = lineEl.querySelectorAll('.clickable-transcript-word');
+            if (!words.length) return;
+
+            const lineStart = parseFloat(lineEl.dataset.time);
+            const lineDuration = nextLineTime ? (nextLineTime - lineStart) : 4;
+            const elapsed = currentTime - lineStart;
+            const progress = Math.min(elapsed / lineDuration, 1);
+            const wordIndex = Math.floor(progress * words.length);
+
+            words.forEach((w, i) => {
+                if (i === wordIndex) {
+                    w.classList.add('word-shadowing-active');
+                } else {
+                    w.classList.remove('word-shadowing-active');
+                }
+            });
+        }
+
+        // Override highlightCurrentLine to also handle shadowing
+        const _originalHighlightCurrentLine = highlightCurrentLine;
+        function highlightCurrentLine(currentTime) {
+            const lines = document.querySelectorAll('.transcript-line');
+            let activeIndex = -1;
+
+            for (let i = 0; i < lines.length; i++) {
+                const lineTime = parseFloat(lines[i].dataset.time);
+                if (currentTime >= lineTime) activeIndex = i;
+                else break;
+            }
+
+            lines.forEach((line, index) => {
+                if (index === activeIndex) {
+                    line.classList.add('active');
+                    if (shadowingMode) {
+                        line.classList.add('shadowing-current');
+                        line.classList.remove('shadowing-done');
+                    }
+                } else {
+                    line.classList.remove('active');
+                    if (shadowingMode) {
+                        line.classList.remove('shadowing-current');
+                        if (index < activeIndex) line.classList.add('shadowing-done');
+                    }
+                }
+            });
+
+            if (!userHasScrolled && activeIndex >= 0 && lines[activeIndex]) {
+                lines[activeIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+
+            // Shadowing: word-by-word highlight + auto-pause at line end
+            if (shadowingMode && activeIndex >= 0 && lines[activeIndex]) {
+                const nextLineTime = lines[activeIndex + 1] ? parseFloat(lines[activeIndex + 1].dataset.time) : null;
+                highlightShadowingWord(lines[activeIndex], currentTime, nextLineTime);
+
+                // If we just crossed into a new line, pause for the user to repeat
+                if (activeIndex !== shadowingLastLineIndex && shadowingLastLineIndex !== -1) {
+                    if (youtubePlayer && typeof youtubePlayer.pauseVideo === 'function') {
+                        youtubePlayer.pauseVideo();
+                        shadowingPausedForRepeat = true;
+                        // Auto-resume after 3 seconds if they don't press play themselves
+                        setTimeout(() => {
+                            if (shadowingPausedForRepeat && shadowingMode) {
+                                youtubePlayer.playVideo();
+                                shadowingPausedForRepeat = false;
+                            }
+                        }, 3000);
+                    }
+                }
+
+                if (activeIndex !== shadowingLastLineIndex) {
+                    shadowingLastLineIndex = activeIndex;
+                    shadowingPausedForRepeat = false;
+                }
+            }
+        }
+        // ─────────────────────────────────────────────────────────────
+
+        // Reset scroll lock each time player opens (so auto-scroll works at start)
+        // Manual scroll/touch on transcript will disable it for that session
 
     </script>
 
