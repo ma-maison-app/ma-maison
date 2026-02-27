@@ -9449,7 +9449,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
                             alert('Données importées avec succès ✓');
                         }
                     } catch (err) {
-                        alert('Erreur : fichier invalide');
+                        alert('Erreur : ' + err.message);
                         console.error(err);
                     }
                 };
