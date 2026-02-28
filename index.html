@@ -8336,9 +8336,73 @@ Ils seront préservés lors de l'affichage !"></textarea>
             }, 1000); // Wait 1 second after last change
         };
         
+        // ============================================
+        // IMAGE STORAGE FIX
+        // Images are stored in localStorage (keyed by word ID) 
+        // to avoid Firestore 1MB document size limit
+        // ============================================
+        function saveImagesToLocalStorage() {
+            const imageMap = {};
+            vocabulary.forEach(word => {
+                if (word.image && word.image.startsWith('data:')) {
+                    imageMap[word.id] = word.image;
+                }
+            });
+            try {
+                localStorage.setItem('vocab_images', JSON.stringify(imageMap));
+                console.log('🖼️ Saved', Object.keys(imageMap).length, 'images to localStorage');
+            } catch (e) {
+                console.warn('⚠️ Could not save images to localStorage:', e);
+            }
+        }
+
+        function loadImagesFromLocalStorage() {
+            try {
+                const imageMap = JSON.parse(localStorage.getItem('vocab_images') || '{}');
+                vocabulary.forEach(word => {
+                    if (!word.image && imageMap[word.id]) {
+                        word.image = imageMap[word.id];
+                    }
+                });
+                console.log('🖼️ Merged images from localStorage');
+            } catch (e) {
+                console.warn('⚠️ Could not load images from localStorage:', e);
+            }
+        }
+
+        // Compress a base64 image to reduce size for Firestore
+        async function compressImage(base64, maxWidth = 300, quality = 0.7) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const scale = Math.min(1, maxWidth / img.width);
+                    canvas.width = Math.round(img.width * scale);
+                    canvas.height = Math.round(img.height * scale);
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    resolve(canvas.toDataURL('image/jpeg', quality));
+                };
+                img.onerror = () => resolve(null); // skip on error
+                img.src = base64;
+            });
+        }
+
+        async function getVocabularyForFirebase() {
+            return await Promise.all(vocabulary.map(async word => {
+                if (word.image && word.image.startsWith('data:')) {
+                    const compressed = await compressImage(word.image);
+                    return { ...word, image: compressed || null };
+                }
+                return word;
+            }));
+        }
+
         // Save all data to Firebase
         async function saveDataToFirebase() {
             console.log('💾 saveDataToFirebase called!');
+            // Always save full-quality images to localStorage as backup
+            saveImagesToLocalStorage();
             
             if (!window.currentUser) {
                 console.error('❌ Save failed - not logged in');
@@ -8384,8 +8448,9 @@ Ils seront préservés lors de l'affichage !"></textarea>
             }
             
             try {
+                const vocabForFirebase = await getVocabularyForFirebase();
                 await setDoc(doc(window.firebaseDB, 'users', window.currentUser.uid), {
-                    vocabulary,
+                    vocabulary: vocabForFirebase,
                     readingList,
                     listeningList,
                     recordings,
@@ -8440,6 +8505,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
             console.log('   - readingPassages:', readingPassages.length, 'items');
             
             try {
+                saveImagesToLocalStorage(); // Save full-quality images separately
                 localStorage.setItem('vocabulary', JSON.stringify(vocabulary));
                 localStorage.setItem('readingList', JSON.stringify(readingList));
                 localStorage.setItem('listeningList', JSON.stringify(listeningList));
@@ -15646,6 +15712,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
                     // Load all data directly into memory
                     if (data.vocabulary) {
                         vocabulary = data.vocabulary;
+                        loadImagesFromLocalStorage(); // Merge images back
                         console.log('✅ Loaded', vocabulary.length, 'vocabulary items');
                     }
                     
