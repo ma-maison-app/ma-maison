@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'ma-maison-v16';
+const CACHE_NAME = 'ma-maison-v17';
 const urlsToCache = [
   './',
   'https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&family=Work+Sans:wght@300;400;500&family=Allura&display=swap',
@@ -8,7 +8,7 @@ const urlsToCache = [
 ];
 
 self.addEventListener('install', (event) => {
-  console.log('Service Worker: Installing v16...');
+  console.log('Service Worker: Installing v17...');
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
@@ -33,7 +33,7 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
-  console.log('Service Worker: Activating v16...');
+  console.log('Service Worker: Activating v17...');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
@@ -45,7 +45,7 @@ self.addEventListener('activate', (event) => {
         })
       );
     }).then(() => {
-      console.log('Service Worker: v16 activated, claiming clients');
+      console.log('Service Worker: v17 activated, claiming clients');
       return self.clients.claim();
     })
   );
