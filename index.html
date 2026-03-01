@@ -6847,6 +6847,11 @@ const firebaseConfig = {
                         <img id="word-image-preview" class="image-preview" style="display: none;">
                     </div>
                     <input type="file" id="word-image-input" accept="image/*" style="display: none;">
+                    <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem; align-items: center;">
+                        <input type="text" class="form-input" id="unsplash-search" placeholder="🔍 Chercher une photo Unsplash..." style="flex:1; font-size:0.85rem;">
+                        <button type="button" class="btn btn-secondary" onclick="searchUnsplash('word')" style="white-space:nowrap; font-size:0.82rem; padding:0.4rem 0.9rem;">Chercher</button>
+                    </div>
+                    <div id="unsplash-results" style="display:none; margin-top:0.5rem; display:grid; grid-template-columns: repeat(4,1fr); gap:0.4rem;"></div>
                 </div>
 
                 <div class="form-group">
@@ -6862,7 +6867,10 @@ const firebaseConfig = {
                             WordReference
                         </a>
                         <a id="main-link-reverso" href="#" target="_blank" class="btn btn-secondary" style="font-size: 0.85rem; padding: 0.4rem 0.8rem; text-decoration: none;">
-                            Reverso
+                            Reverso Context
+                        </a>
+                        <a id="main-link-wiktionary" href="#" target="_blank" class="btn btn-secondary" style="font-size: 0.85rem; padding: 0.4rem 0.8rem; text-decoration: none;">
+                            Wiktionary
                         </a>
                         <a id="main-link-collins" href="#" target="_blank" class="btn btn-secondary" style="font-size: 0.85rem; padding: 0.4rem 0.8rem; text-decoration: none;">
                             Collins
@@ -6871,7 +6879,7 @@ const firebaseConfig = {
                             Larousse
                         </a>
                         <a id="main-link-youglish" href="#" target="_blank" class="btn btn-secondary" style="font-size: 0.85rem; padding: 0.4rem 0.8rem; text-decoration: none; background: var(--rose-pale); color: var(--burgundy);">
-                            YouGlish
+                            YouGlish 🎧
                         </a>
                     </div>
                 </div>
@@ -6899,6 +6907,32 @@ const firebaseConfig = {
                         <option value="m">masculin</option>
                         <option value="f">féminin</option>
                     </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Type de mot (optionnel)</label>
+                    <select class="form-select" id="wordtype-input">
+                        <option value="">—</option>
+                        <option value="nom">Nom</option>
+                        <option value="verbe">Verbe</option>
+                        <option value="adjectif">Adjectif</option>
+                        <option value="adverbe">Adverbe</option>
+                        <option value="expression">Expression</option>
+                        <option value="préposition">Préposition</option>
+                        <option value="conjonction">Conjonction</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Collocations (optionnel)</label>
+                    <input type="text" class="form-input" id="collocations-input" placeholder="ex: avoir peur, mourir de peur, une peur bleue">
+                    <small style="color:var(--text-soft);font-size:0.82rem;">Les expressions naturelles avec ce mot, séparées par des virgules</small>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Famille de mots (optionnel)</label>
+                    <input type="text" class="form-input" id="wordfamily-input" placeholder="ex: aimer → amour, amoureux, aimable">
+                    <small style="color:var(--text-soft);font-size:0.82rem;">Les mots de la même famille, séparés par des virgules</small>
                 </div>
 
                 <div class="category-grid">
@@ -7006,6 +7040,11 @@ const firebaseConfig = {
                         <img id="edit-word-image-preview" class="image-preview" style="display: none;">
                     </div>
                     <input type="file" id="edit-word-image-input" accept="image/*" style="display: none;">
+                    <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem; align-items: center;">
+                        <input type="text" class="form-input" id="edit-unsplash-search" placeholder="🔍 Chercher une photo Unsplash..." style="flex:1; font-size:0.85rem;">
+                        <button type="button" class="btn btn-secondary" onclick="searchUnsplash('edit')" style="white-space:nowrap; font-size:0.82rem; padding:0.4rem 0.9rem;">Chercher</button>
+                    </div>
+                    <div id="edit-unsplash-results" style="display:none; margin-top:0.5rem; display:grid; grid-template-columns: repeat(4,1fr); gap:0.4rem;"></div>
                 </div>
 
                 <div class="form-group">
@@ -7044,6 +7083,32 @@ const firebaseConfig = {
                         <option value="m">masculin</option>
                         <option value="f">féminin</option>
                     </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Type de mot (optionnel)</label>
+                    <select class="form-select" id="edit-wordtype-input">
+                        <option value="">—</option>
+                        <option value="nom">Nom</option>
+                        <option value="verbe">Verbe</option>
+                        <option value="adjectif">Adjectif</option>
+                        <option value="adverbe">Adverbe</option>
+                        <option value="expression">Expression</option>
+                        <option value="préposition">Préposition</option>
+                        <option value="conjonction">Conjonction</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Collocations (optionnel)</label>
+                    <input type="text" class="form-input" id="edit-collocations-input" placeholder="ex: avoir peur, mourir de peur, une peur bleue">
+                    <small style="color:var(--text-soft);font-size:0.82rem;">Les expressions naturelles avec ce mot, séparées par des virgules</small>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Famille de mots (optionnel)</label>
+                    <input type="text" class="form-input" id="edit-wordfamily-input" placeholder="ex: aimer → amour, amoureux, aimable">
+                    <small style="color:var(--text-soft);font-size:0.82rem;">Les mots de la même famille, séparés par des virgules</small>
                 </div>
 
                 <div class="category-grid">
@@ -7460,6 +7525,17 @@ Ils seront préservés lors de l'affichage !"></textarea>
                     <textarea class="form-textarea" id="listening-note" placeholder="Expressions utiles, vocabulaire intéressant, contexte..."></textarea>
                 </div>
 
+                <div class="form-group">
+                    <label class="form-label" style="display:flex;align-items:center;gap:0.5rem;">
+                        <svg viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px;color:var(--crimson);">
+                            <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+                        </svg>
+                        Lien du document transcript (optionnel)
+                    </label>
+                    <input type="url" class="form-input" id="listening-doc-url" placeholder="https://docs.google.com/...">
+                    <small style="color:var(--text-soft);font-size:0.85rem;">Un lien vers un Google Doc, PDF ou autre document de transcription</small>
+                </div>
+
                 <div class="form-actions">
                     <button type="button" class="btn btn-secondary" onclick="closeModal('listening-modal')">Annuler</button>
                     <button type="submit" class="btn btn-primary">Ajouter</button>
@@ -7542,6 +7618,17 @@ Ils seront préservés lors de l'affichage !"></textarea>
                 <div class="form-group">
                     <label class="form-label">Notes personnelles</label>
                     <textarea class="form-textarea" id="edit-listening-note"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" style="display:flex;align-items:center;gap:0.5rem;">
+                        <svg viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px;color:var(--crimson);">
+                            <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+                        </svg>
+                        Lien du document transcript (optionnel)
+                    </label>
+                    <input type="url" class="form-input" id="edit-listening-doc-url" placeholder="https://docs.google.com/...">
+                    <small style="color:var(--text-soft);font-size:0.85rem;">Un lien vers un Google Doc, PDF ou autre document de transcription</small>
                 </div>
 
                 <div class="form-actions">
@@ -10577,6 +10664,8 @@ Ils seront préservés lors de l'affichage !"></textarea>
                     
                     <div class="category-tags">
                         ${word.favorite ? `<div class="category-tag" style="background: var(--gold-pale); color: var(--navy);">⭐ Favori</div>` : ''}
+                        ${word.wordType ? `<div class="category-tag" style="background: rgba(139,38,53,0.08); color: var(--crimson); border: 1px solid rgba(139,38,53,0.2);">${word.wordType}</div>` : ''}
+                        ${word.gender ? `<div class="category-tag" style="background: ${word.gender === 'm' ? 'rgba(74,111,165,0.12)' : 'rgba(165,74,111,0.12)'};color:${word.gender === 'm' ? '#4a6fa5' : '#a54a6f'};border:1px solid ${word.gender === 'm' ? 'rgba(74,111,165,0.25)' : 'rgba(165,74,111,0.25)'};">${word.gender === 'm' ? 'masculin' : 'féminin'}</div>` : ''}
                         ${word.theme ? `<div class="category-tag topic">${word.theme}</div>` : ''}
                         ${word.week ? `<div class="category-tag time">Semaine ${word.week}</div>` : ''}
                         ${word.quarter ? `<div class="category-tag time">${word.quarter}</div>` : ''}
@@ -10614,6 +10703,25 @@ Ils seront préservés lors de l'affichage !"></textarea>
                         ` : ''}
                     </div>
                     ${word.note ? `<div class="word-note">${word.note}</div>` : ''}
+                    ${word.collocations ? `
+                        <div style="margin-top:0.75rem; padding:0.75rem; background:rgba(201,168,97,0.08); border-left:3px solid var(--gold); border-radius:6px;">
+                            <div style="font-size:0.75rem; font-weight:600; color:var(--text-soft); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:0.35rem;">Collocations</div>
+                            <div style="font-size:0.88rem; color:var(--text); line-height:1.5;">${word.collocations}</div>
+                        </div>
+                    ` : ''}
+                    ${word.wordFamily ? `
+                        <div style="margin-top:0.75rem; padding:0.75rem; background:rgba(139,38,53,0.05); border-left:3px solid var(--crimson); border-radius:6px;">
+                            <div style="font-size:0.75rem; font-weight:600; color:var(--text-soft); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:0.35rem;">Famille de mots</div>
+                            <div style="font-size:0.88rem; color:var(--text); line-height:1.5;">${word.wordFamily}</div>
+                        </div>
+                    ` : ''}
+                    <div style="margin-top:0.75rem; padding-top:0.6rem; border-top:1px solid var(--whisper); display:flex; flex-wrap:wrap; gap:0.35rem;">
+                        <a href="https://www.wordreference.com/fren/${encodeURIComponent(word.french)}" target="_blank" rel="noopener" style="font-size:0.65rem; letter-spacing:0.06em; text-transform:uppercase; color:var(--crimson); text-decoration:none; padding:0.28rem 0.6rem; border:1px solid rgba(139,38,53,0.25); border-radius:4px; transition:all 0.15s;" onmouseover="this.style.background='rgba(139,38,53,0.08)'" onmouseout="this.style.background='transparent'">WR</a>
+                        <a href="https://context.reverso.net/translation/french-english/${encodeURIComponent(word.french)}" target="_blank" rel="noopener" style="font-size:0.65rem; letter-spacing:0.06em; text-transform:uppercase; color:var(--crimson); text-decoration:none; padding:0.28rem 0.6rem; border:1px solid rgba(139,38,53,0.25); border-radius:4px; transition:all 0.15s;" onmouseover="this.style.background='rgba(139,38,53,0.08)'" onmouseout="this.style.background='transparent'">Reverso</a>
+                        <a href="https://fr.wiktionary.org/wiki/${encodeURIComponent(word.french)}" target="_blank" rel="noopener" style="font-size:0.65rem; letter-spacing:0.06em; text-transform:uppercase; color:var(--crimson); text-decoration:none; padding:0.28rem 0.6rem; border:1px solid rgba(139,38,53,0.25); border-radius:4px; transition:all 0.15s;" onmouseover="this.style.background='rgba(139,38,53,0.08)'" onmouseout="this.style.background='transparent'">Wikt</a>
+                        <a href="https://youglish.com/pronounce/${encodeURIComponent(word.french)}/french" target="_blank" rel="noopener" style="font-size:0.65rem; letter-spacing:0.06em; text-transform:uppercase; color:var(--crimson); text-decoration:none; padding:0.28rem 0.6rem; border:1px solid rgba(139,38,53,0.25); border-radius:4px; transition:all 0.15s;" onmouseover="this.style.background='rgba(139,38,53,0.08)'" onmouseout="this.style.background='transparent'">YouGlish 🎧</a>
+                        <a href="https://www.larousse.fr/dictionnaires/francais/${encodeURIComponent(word.french)}" target="_blank" rel="noopener" style="font-size:0.65rem; letter-spacing:0.06em; text-transform:uppercase; color:var(--crimson); text-decoration:none; padding:0.28rem 0.6rem; border:1px solid rgba(139,38,53,0.25); border-radius:4px; transition:all 0.15s;" onmouseover="this.style.background='rgba(139,38,53,0.08)'" onmouseout="this.style.background='transparent'">Larousse</a>
+                    </div>
                 </div>
             `).join('');
             
@@ -10783,6 +10891,9 @@ Ils seront préservés lors de l'affichage !"></textarea>
             document.getElementById('edit-context2').value = word.contexts && word.contexts[1] ? word.contexts[1] : '';
             document.getElementById('edit-context3').value = word.contexts && word.contexts[2] ? word.contexts[2] : '';
             document.getElementById('edit-note-input').value = word.note || '';
+            document.getElementById('edit-wordtype-input').value = word.wordType || '';
+            document.getElementById('edit-collocations-input').value = word.collocations || '';
+            document.getElementById('edit-wordfamily-input').value = word.wordFamily || '';
 
             if (word.image) {
                 const preview = document.getElementById('edit-word-image-preview');
@@ -10838,6 +10949,9 @@ Ils seront préservés lors de l'affichage !"></textarea>
                     document.getElementById('context3').value.trim()
                 ].filter(Boolean),
                 note: document.getElementById('note-input').value.trim() || '',
+                wordType: document.getElementById('wordtype-input').value || '',
+                collocations: document.getElementById('collocations-input').value.trim() || '',
+                wordFamily: document.getElementById('wordfamily-input').value.trim() || '',
                 image: imagePreview.style.display !== 'none' ? imagePreview.src : null,
                 created: new Date().toISOString()
             };
@@ -10901,6 +11015,9 @@ Ils seront préservés lors de l'affichage !"></textarea>
                     document.getElementById('edit-context3').value.trim()
                 ].filter(Boolean),
                 note: document.getElementById('edit-note-input').value.trim() || '',
+                wordType: document.getElementById('edit-wordtype-input').value || '',
+                collocations: document.getElementById('edit-collocations-input').value.trim() || '',
+                wordFamily: document.getElementById('edit-wordfamily-input').value.trim() || '',
                 image: imagePreview.style.display !== 'none' ? imagePreview.src : vocabulary[index].image
             };
 
@@ -11719,6 +11836,13 @@ Ils seront préservés lors de l'affichage !"></textarea>
                                 Écouter
                             </button>
                         ` : ''}
+                        ${item.docUrl ? `
+                            <a href="${item.docUrl}" target="_blank" rel="noopener" class="icon-btn" title="Ouvrir le document transcript">
+                                <svg class="svg-icon" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+                                </svg>
+                            </a>
+                        ` : ''}
                         <button class="icon-btn" onclick="editListening(${item.id})" title="Modifier">
                             <svg class="svg-icon" viewBox="0 0 24 24">
                                 <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
@@ -11860,6 +11984,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
             document.getElementById('edit-listening-transcript-text').value = item.transcriptText || '';
             document.getElementById('edit-listening-progress').value = item.progress || 'not-started';
             document.getElementById('edit-listening-note').value = item.note || '';
+            document.getElementById('edit-listening-doc-url').value = item.docUrl || '';
 
             openModal('edit-listening-modal');
         }
@@ -11901,6 +12026,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
                 transcript: parsedTranscript,
                 progress: document.getElementById('listening-progress').value,
                 note: document.getElementById('listening-note').value.trim() || '',
+                docUrl: document.getElementById('listening-doc-url').value.trim() || '',
                 created: new Date().toISOString()
             };
 
@@ -11950,7 +12076,8 @@ Ils seront préservés lors de l'affichage !"></textarea>
                 transcriptText: transcriptText,
                 transcript: parsedTranscript,
                 progress: document.getElementById('edit-listening-progress').value,
-                note: document.getElementById('edit-listening-note').value.trim() || ''
+                note: document.getElementById('edit-listening-note').value.trim() || '',
+                docUrl: document.getElementById('edit-listening-doc-url').value.trim() || ''
             };
 
             // Validate required field
@@ -14178,27 +14305,42 @@ Ils seront préservés lors de l'affichage !"></textarea>
             const filteredVocabulary = getFilteredVocabulary();
             const sortedVocabulary = [...filteredVocabulary].sort((a, b) => b.id - a.id);
             
-            // CSV Header
-            let csvContent = "French,Meaning,Example Sentence,Theme,Week,Notes\n";
+            // Escape commas and quotes for CSV
+            const escapeCsv = (str) => {
+                str = String(str || '');
+                if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                    return `"${str.replace(/"/g, '""')}"`;
+                }
+                return str;
+            };
+
+            // CSV Header - all fields
+            const csvHeaders = ['french','article','gender','wordType','meaning','collocations','wordFamily','context_neutral','context_emotional','context_idiomatic','context','theme','week','quarter','year','note','favorite'];
+            let csvContent = csvHeaders.join(',') + '\n';
             
             // Add each word
             sortedVocabulary.forEach(word => {
-                const french = word.article ? `${word.article} ${word.french}` : word.french;
-                const meaning = word.meaning || '';
-                const example = word.contexts && word.contexts[0] ? word.contexts[0] : '';
-                const theme = word.theme || '';
-                const week = word.week ? `Week ${word.week}` : '';
-                const note = word.note || '';
+                const row = [
+                    word.french || '',
+                    word.article || '',
+                    word.gender === 'm' ? 'masculin' : word.gender === 'f' ? 'feminin' : '',
+                    word.wordType || '',
+                    word.meaning || '',
+                    word.collocations || '',
+                    word.wordFamily || '',
+                    (word.contexts && word.contexts[0]) ? word.contexts[0] : '',
+                    (word.contexts && word.contexts[1]) ? word.contexts[1] : '',
+                    (word.contexts && word.contexts[2]) ? word.contexts[2] : '',
+                    word.context || '',
+                    word.theme || '',
+                    word.week ? `Week ${word.week}` : '',
+                    word.quarter || '',
+                    word.year || '',
+                    word.note || '',
+                    word.favorite ? 'oui' : ''
+                ].map(escapeCsv);
                 
-                // Escape commas and quotes for CSV
-                const escapeCsv = (str) => {
-                    if (str.includes(',') || str.includes('"') || str.includes('\n')) {
-                        return `"${str.replace(/"/g, '""')}"`;
-                    }
-                    return str;
-                };
-                
-                csvContent += `${escapeCsv(french)},${escapeCsv(meaning)},${escapeCsv(example)},${escapeCsv(theme)},${escapeCsv(week)},${escapeCsv(note)}\n`;
+                csvContent += row.join(',') + '\n';
             });
             
             // Create download
@@ -14760,6 +14902,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
                     if (word) {
                         document.getElementById('main-link-wordreference').href = `https://www.wordreference.com/fren/${encodeURIComponent(word)}`;
                         document.getElementById('main-link-reverso').href = `https://context.reverso.net/translation/french-english/${encodeURIComponent(word)}`;
+                        document.getElementById('main-link-wiktionary').href = `https://fr.wiktionary.org/wiki/${encodeURIComponent(word)}`;
                         document.getElementById('main-link-collins').href = `https://www.collinsdictionary.com/dictionary/french-english/${encodeURIComponent(word)}`;
                         document.getElementById('main-link-larousse').href = `https://www.larousse.fr/dictionnaires/francais/${encodeURIComponent(word)}`;
                         document.getElementById('main-link-youglish').href = `https://youglish.com/pronounce/${encodeURIComponent(word)}/french`;
@@ -17988,6 +18131,52 @@ Peux-tu ajouter des timestamps réalistes au début de chaque ligne ? Format: [M
             alert(`✅ ${count} mot${count > 1 ? 's' : ''} ajouté${count > 1 ? 's' : ''} au Jardin! (vert)`);
             closeWordAnalysisPopup();
         }
+
+        // ============================================
+        // UNSPLASH IMAGE SEARCH
+        // ============================================
+        async function searchUnsplash(mode) {
+            const searchId = mode === 'word' ? 'unsplash-search' : 'edit-unsplash-search';
+            const resultsId = mode === 'word' ? 'unsplash-results' : 'edit-unsplash-results';
+            const previewId = mode === 'word' ? 'word-image-preview' : 'edit-word-image-preview';
+            
+            const query = document.getElementById(searchId).value.trim();
+            if (!query) return;
+            
+            const resultsDiv = document.getElementById(resultsId);
+            resultsDiv.style.display = 'grid';
+            resultsDiv.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:1rem;color:var(--text-soft);font-size:0.85rem;">Chargement...</div>';
+            
+            try {
+                // Using Unsplash source (no API key needed for direct image URLs)
+                const keywords = encodeURIComponent(query);
+                const images = [];
+                // Generate varied Unsplash URLs for the search term
+                for (let i = 0; i < 8; i++) {
+                    images.push(`https://source.unsplash.com/120x120/?${keywords}&sig=${Date.now() + i}`);
+                }
+                
+                resultsDiv.innerHTML = images.map((url, i) => `
+                    <img src="${url}" 
+                         style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;cursor:pointer;border:2px solid transparent;transition:all 0.2s;"
+                         onmouseover="this.style.borderColor='var(--crimson)';this.style.transform='scale(1.05)'"
+                         onmouseout="this.style.borderColor='transparent';this.style.transform='scale(1)'"
+                         onclick="selectUnsplashImage(this.src, '${previewId}', '${resultsId}')"
+                         onerror="this.style.display='none'"
+                         loading="lazy">
+                `).join('');
+            } catch(e) {
+                resultsDiv.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:0.5rem;color:var(--text-soft);font-size:0.82rem;">Erreur. Essaie de coller directement une URL d'image ci-dessous.</div>';
+            }
+        }
+
+        function selectUnsplashImage(src, previewId, resultsId) {
+            const preview = document.getElementById(previewId);
+            preview.src = src;
+            preview.style.display = 'block';
+            document.getElementById(resultsId).style.display = 'none';
+        }
+
     </script>
 
     <!-- Multi-select toolbar -->
