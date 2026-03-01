@@ -6847,11 +6847,11 @@ const firebaseConfig = {
                         <img id="word-image-preview" class="image-preview" style="display: none;">
                     </div>
                     <input type="file" id="word-image-input" accept="image/*" style="display: none;">
-                    <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem; align-items: center;">
-                        <input type="text" class="form-input" id="unsplash-search" placeholder="🔍 Chercher une photo Unsplash..." style="flex:1; font-size:0.85rem;">
-                        <button type="button" class="btn btn-secondary" onclick="searchUnsplash('word')" style="white-space:nowrap; font-size:0.82rem; padding:0.4rem 0.9rem;">Chercher</button>
+                    <div style="margin-top: 0.5rem;">
+                        <button type="button" class="btn btn-secondary" id="google-img-btn-add" style="font-size:0.82rem; padding:0.4rem 0.9rem; width:100%;" onclick="openGoogleImages('word')">🖼 Chercher une image sur Google</button>
+                        <small style="color:var(--text-soft);font-size:0.8rem;">Ouvre Google Images → clic droit sur une image → "Copier l'adresse de l'image" → colle l'URL ci-dessous</small>
+                        <input type="text" class="form-input" id="image-url-input" placeholder="Colle l'URL de l'image ici..." style="margin-top:0.4rem; font-size:0.82rem;" oninput="previewImageUrl(this.value, 'word-image-preview')">
                     </div>
-                    <div id="unsplash-results" style="display:none; margin-top:0.5rem; display:grid; grid-template-columns: repeat(4,1fr); gap:0.4rem;"></div>
                 </div>
 
                 <div class="form-group">
@@ -6887,6 +6887,12 @@ const firebaseConfig = {
                 <div class="form-group">
                     <label class="form-label">Signification / Meaning</label>
                     <input type="text" class="form-input" id="meaning-input" placeholder="What it means to you">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Prononciation IPA (optionnel)</label>
+                    <input type="text" class="form-input" id="ipa-input" placeholder="ex: /fœj/, /a.muʁ/, /bɔ̃ʒuʁ/" style="font-family: serif; font-size: 1rem; letter-spacing: 0.05em;">
+                    <small style="color:var(--text-soft);font-size:0.82rem;">Trouve l'IPA sur <a href="https://fr.wiktionary.org" target="_blank" style="color:var(--crimson);">Wiktionary</a> ou <a href="https://www.pronouncekiwi.com" target="_blank" style="color:var(--crimson);">PronounceKiwi</a></small>
                 </div>
 
                 <div class="form-group">
@@ -7040,11 +7046,11 @@ const firebaseConfig = {
                         <img id="edit-word-image-preview" class="image-preview" style="display: none;">
                     </div>
                     <input type="file" id="edit-word-image-input" accept="image/*" style="display: none;">
-                    <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem; align-items: center;">
-                        <input type="text" class="form-input" id="edit-unsplash-search" placeholder="🔍 Chercher une photo Unsplash..." style="flex:1; font-size:0.85rem;">
-                        <button type="button" class="btn btn-secondary" onclick="searchUnsplash('edit')" style="white-space:nowrap; font-size:0.82rem; padding:0.4rem 0.9rem;">Chercher</button>
+                    <div style="margin-top: 0.5rem;">
+                        <button type="button" class="btn btn-secondary" id="google-img-btn-edit" style="font-size:0.82rem; padding:0.4rem 0.9rem; width:100%;" onclick="openGoogleImages('edit')">🖼 Chercher une image sur Google</button>
+                        <small style="color:var(--text-soft);font-size:0.8rem;">Ouvre Google Images → clic droit → "Copier l'adresse de l'image" → colle l'URL ci-dessous</small>
+                        <input type="text" class="form-input" id="edit-image-url-input" placeholder="Colle l'URL de l'image ici..." style="margin-top:0.4rem; font-size:0.82rem;" oninput="previewImageUrl(this.value, 'edit-word-image-preview')">
                     </div>
-                    <div id="edit-unsplash-results" style="display:none; margin-top:0.5rem; display:grid; grid-template-columns: repeat(4,1fr); gap:0.4rem;"></div>
                 </div>
 
                 <div class="form-group">
@@ -7055,6 +7061,11 @@ const firebaseConfig = {
                 <div class="form-group">
                     <label class="form-label">Signification / Meaning</label>
                     <input type="text" class="form-input" id="edit-meaning-input">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Prononciation IPA (optionnel)</label>
+                    <input type="text" class="form-input" id="edit-ipa-input" placeholder="ex: /fœj/, /a.muʁ/, /bɔ̃ʒuʁ/" style="font-family: serif; font-size: 1rem; letter-spacing: 0.05em;">
                 </div>
                 
                 <div class="form-group">
@@ -10673,7 +10684,18 @@ Ils seront préservés lors de l'affichage !"></textarea>
                     </div>
                     
                     <div class="word-french">${word.french}</div>
+                    ${word.ipa ? `<div style="font-family:serif;font-size:1rem;color:var(--text-soft);margin-top:0.2rem;letter-spacing:0.05em;">${word.ipa}</div>` : ''}
                     ${word.meaning ? `<div class="word-meaning">${word.meaning}</div>` : ''}
+                    ${(() => {
+                        const srs = word.srs;
+                        if (!srs) return `<div style="margin-top:0.5rem;display:flex;align-items:center;gap:0.5rem;"><div style="flex:1;height:4px;background:rgba(139,38,53,0.1);border-radius:2px;overflow:hidden;"><div style="width:0%;height:100%;background:var(--crimson);border-radius:2px;"></div></div><span style="font-size:0.65rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-soft);">Nouveau</span></div>`;
+                        const status = srs.status || 'new';
+                        const reps = srs.repetitions || 0;
+                        const pct = status === 'mastered' ? 100 : status === 'review' ? Math.min(90, reps * 20) : status === 'learning' ? Math.min(40, reps * 15) : 0;
+                        const color = status === 'mastered' ? '#4a8f6f' : status === 'review' ? 'var(--gold)' : status === 'learning' ? 'var(--crimson)' : 'var(--text-soft)';
+                        const label = status === 'mastered' ? 'Maîtrisé ✓' : status === 'review' ? 'En révision' : status === 'learning' ? 'En cours' : 'Nouveau';
+                        return `<div style="margin-top:0.6rem;display:flex;align-items:center;gap:0.6rem;"><div style="flex:1;height:4px;background:rgba(139,38,53,0.08);border-radius:2px;overflow:hidden;"><div style="width:${pct}%;height:100%;background:${color};border-radius:2px;transition:width 0.4s ease;"></div></div><span style="font-size:0.62rem;letter-spacing:0.08em;text-transform:uppercase;color:${color};white-space:nowrap;">${label}</span></div>`;
+                    })()}
                     ${word.context ? `
                         <div style="margin-top: 0.75rem; padding: 0.75rem; background: var(--whisper); border-left: 3px solid var(--gold); border-radius: 6px;">
                             <div style="font-size: 0.8rem; font-weight: 500; color: var(--text-soft); margin-bottom: 0.3rem;">📝 Contexte:</div>
@@ -10721,6 +10743,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
                         <a href="https://fr.wiktionary.org/wiki/${encodeURIComponent(word.french)}" target="_blank" rel="noopener" style="font-size:0.65rem; letter-spacing:0.06em; text-transform:uppercase; color:var(--crimson); text-decoration:none; padding:0.28rem 0.6rem; border:1px solid rgba(139,38,53,0.25); border-radius:4px; transition:all 0.15s;" onmouseover="this.style.background='rgba(139,38,53,0.08)'" onmouseout="this.style.background='transparent'">Wikt</a>
                         <a href="https://youglish.com/pronounce/${encodeURIComponent(word.french)}/french" target="_blank" rel="noopener" style="font-size:0.65rem; letter-spacing:0.06em; text-transform:uppercase; color:var(--crimson); text-decoration:none; padding:0.28rem 0.6rem; border:1px solid rgba(139,38,53,0.25); border-radius:4px; transition:all 0.15s;" onmouseover="this.style.background='rgba(139,38,53,0.08)'" onmouseout="this.style.background='transparent'">YouGlish 🎧</a>
                         <a href="https://www.larousse.fr/dictionnaires/francais/${encodeURIComponent(word.french)}" target="_blank" rel="noopener" style="font-size:0.65rem; letter-spacing:0.06em; text-transform:uppercase; color:var(--crimson); text-decoration:none; padding:0.28rem 0.6rem; border:1px solid rgba(139,38,53,0.25); border-radius:4px; transition:all 0.15s;" onmouseover="this.style.background='rgba(139,38,53,0.08)'" onmouseout="this.style.background='transparent'">Larousse</a>
+                        <a href="https://www.google.com/search?q=${encodeURIComponent(word.french)}&tbm=isch" target="_blank" rel="noopener" style="font-size:0.65rem; letter-spacing:0.06em; text-transform:uppercase; color:var(--crimson); text-decoration:none; padding:0.28rem 0.6rem; border:1px solid rgba(139,38,53,0.25); border-radius:4px; transition:all 0.15s;" onmouseover="this.style.background='rgba(139,38,53,0.08)'" onmouseout="this.style.background='transparent'">🖼 Images</a>
                     </div>
                 </div>
             `).join('');
@@ -10894,6 +10917,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
             document.getElementById('edit-wordtype-input').value = word.wordType || '';
             document.getElementById('edit-collocations-input').value = word.collocations || '';
             document.getElementById('edit-wordfamily-input').value = word.wordFamily || '';
+            document.getElementById('edit-ipa-input').value = word.ipa || '';
 
             if (word.image) {
                 const preview = document.getElementById('edit-word-image-preview');
@@ -10952,6 +10976,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
                 wordType: document.getElementById('wordtype-input').value || '',
                 collocations: document.getElementById('collocations-input').value.trim() || '',
                 wordFamily: document.getElementById('wordfamily-input').value.trim() || '',
+                ipa: document.getElementById('ipa-input').value.trim() || '',
                 image: imagePreview.style.display !== 'none' ? imagePreview.src : null,
                 created: new Date().toISOString()
             };
@@ -11018,6 +11043,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
                 wordType: document.getElementById('edit-wordtype-input').value || '',
                 collocations: document.getElementById('edit-collocations-input').value.trim() || '',
                 wordFamily: document.getElementById('edit-wordfamily-input').value.trim() || '',
+                ipa: document.getElementById('edit-ipa-input').value.trim() || '',
                 image: imagePreview.style.display !== 'none' ? imagePreview.src : vocabulary[index].image
             };
 
@@ -14315,7 +14341,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
             };
 
             // CSV Header - all fields
-            const csvHeaders = ['french','article','gender','wordType','meaning','collocations','wordFamily','context_neutral','context_emotional','context_idiomatic','context','theme','week','quarter','year','note','favorite'];
+            const csvHeaders = ['french','article','gender','wordType','ipa','meaning','collocations','wordFamily','context_neutral','context_emotional','context_idiomatic','context','theme','week','quarter','year','note','favorite'];
             let csvContent = csvHeaders.join(',') + '\n';
             
             // Add each word
@@ -14326,6 +14352,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
                     word.gender === 'm' ? 'masculin' : word.gender === 'f' ? 'feminin' : '',
                     word.wordType || '',
                     word.meaning || '',
+                    word.ipa || '',
                     word.collocations || '',
                     word.wordFamily || '',
                     (word.contexts && word.contexts[0]) ? word.contexts[0] : '',
@@ -18133,48 +18160,20 @@ Peux-tu ajouter des timestamps réalistes au début de chaque ligne ? Format: [M
         }
 
         // ============================================
-        // UNSPLASH IMAGE SEARCH
+        // IMAGE HELPERS
         // ============================================
-        async function searchUnsplash(mode) {
-            const searchId = mode === 'word' ? 'unsplash-search' : 'edit-unsplash-search';
-            const resultsId = mode === 'word' ? 'unsplash-results' : 'edit-unsplash-results';
-            const previewId = mode === 'word' ? 'word-image-preview' : 'edit-word-image-preview';
-            
-            const query = document.getElementById(searchId).value.trim();
-            if (!query) return;
-            
-            const resultsDiv = document.getElementById(resultsId);
-            resultsDiv.style.display = 'grid';
-            resultsDiv.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:1rem;color:var(--text-soft);font-size:0.85rem;">Chargement...</div>';
-            
-            try {
-                // Using Unsplash source (no API key needed for direct image URLs)
-                const keywords = encodeURIComponent(query);
-                const images = [];
-                // Generate varied Unsplash URLs for the search term
-                for (let i = 0; i < 8; i++) {
-                    images.push(`https://source.unsplash.com/120x120/?${keywords}&sig=${Date.now() + i}`);
-                }
-                
-                resultsDiv.innerHTML = images.map((url, i) => `
-                    <img src="${url}" 
-                         style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;cursor:pointer;border:2px solid transparent;transition:all 0.2s;"
-                         onmouseover="this.style.borderColor='var(--crimson)';this.style.transform='scale(1.05)'"
-                         onmouseout="this.style.borderColor='transparent';this.style.transform='scale(1)'"
-                         onclick="selectUnsplashImage(this.src, '${previewId}', '${resultsId}')"
-                         onerror="this.style.display='none'"
-                         loading="lazy">
-                `).join('');
-            } catch(e) {
-                resultsDiv.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:0.5rem;color:var(--text-soft);font-size:0.82rem;">Erreur. Essaie de coller directement une URL d'image ci-dessous.</div>';
-            }
+        function openGoogleImages(mode) {
+            const wordField = mode === 'word' ? 'word-input' : 'edit-word-input';
+            const word = document.getElementById(wordField).value.trim() || 'french word';
+            window.open(`https://www.google.com/search?q=${encodeURIComponent(word)}&tbm=isch`, '_blank');
         }
 
-        function selectUnsplashImage(src, previewId, resultsId) {
+        function previewImageUrl(url, previewId) {
+            if (!url.trim()) return;
             const preview = document.getElementById(previewId);
-            preview.src = src;
+            preview.src = url.trim();
             preview.style.display = 'block';
-            document.getElementById(resultsId).style.display = 'none';
+            preview.onerror = () => { preview.style.display = 'none'; };
         }
 
     </script>
