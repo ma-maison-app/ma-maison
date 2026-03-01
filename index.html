@@ -7208,18 +7208,28 @@ const firebaseConfig = {
             </div>
             
             <div style="margin-bottom: 1.5rem;">
-                <p style="margin-bottom: 1rem; color: var(--text-soft);">
-                    Colle tes mots dans le format suivant (une ligne par mot):
+                <p style="margin-bottom: 0.75rem; color: var(--text-soft);">
+                    Une ligne par mot. Chaque champ séparé par <code style="background:var(--cream-dark);padding:0.1rem 0.4rem;border-radius:4px;">|</code>
                 </p>
-                <div style="background: var(--cream-dark); padding: 1rem; border-radius: 8px; font-family: monospace; font-size: 0.85rem; margin-bottom: 1rem;">
-                    embrasure | window recess | La lumière entre par l'embrasure. | architecture<br>
-                    épanouissement | blooming, fulfillment | Son épanouissement personnel est visible.<br>
-                    soupçon | hint, suspicion | Il y a un soupçon de vanille. | cuisine
+                <div style="background: var(--cream-dark); padding: 1rem; border-radius: 8px; font-family: monospace; font-size: 0.78rem; margin-bottom: 1rem; line-height: 1.8; overflow-x:auto;">
+                    <span style="color:var(--crimson);font-weight:600;">mot</span> | <span style="color:var(--crimson);font-weight:600;">signification</span> | genre | type | IPA | exemple | collocations | famille | thème<br><br>
+                    amour | love | m | nom | /a.muʁ/ | Je suis tombé amoureux. | tomber amoureux, être amoureux | amoureux, aimer, aimable | émotions<br>
+                    feuille | leaf / sheet | f | nom | /fœj/ | La feuille tombe de l'arbre. || | nature<br>
+                    épanouissement | blooming, fulfillment | m | nom | | Son épanouissement est visible. | | s'épanouir, épanoui |<br>
+                    soupçon | hint, suspicion | m | nom | /sup.sɔ̃/ | Il y a un soupçon de vanille. | avoir des soupçons | soupçonner |
                 </div>
-                <p style="color: var(--text-soft); font-size: 0.9rem;">
-                    <strong>Format:</strong> mot français | signification | exemple (optionnel) | thème (optionnel)<br>
-                    Sépare avec le symbole | (barre verticale)
-                </p>
+                <div style="background: rgba(139,38,53,0.05); border: 1px solid rgba(139,38,53,0.15); border-radius: 8px; padding: 0.9rem 1rem; font-size: 0.83rem; color: var(--text-soft); line-height:1.7;">
+                    <strong style="color:var(--text);">Colonnes (dans l'ordre) :</strong><br>
+                    1. <strong>mot français</strong> (obligatoire) — avec ou sans article: <em>le chat</em> ou <em>chat</em><br>
+                    2. <strong>signification</strong> (obligatoire)<br>
+                    3. genre: <code>m</code> ou <code>f</code> (optionnel)<br>
+                    4. type: <code>nom</code>, <code>verbe</code>, <code>adjectif</code>, <code>adverbe</code>, <code>expression</code> (optionnel)<br>
+                    5. IPA: <code>/a.muʁ/</code> (optionnel)<br>
+                    6. exemple (optionnel)<br>
+                    7. collocations (optionnel)<br>
+                    8. famille de mots (optionnel)<br>
+                    9. thème (optionnel — sinon le thème par défaut s'applique)
+                </div>
             </div>
             
             <form id="bulk-import-form">
@@ -7228,7 +7238,7 @@ const firebaseConfig = {
                     <textarea 
                         class="form-textarea" 
                         id="bulk-import-text" 
-                        placeholder="embrasure | window recess | La lumière entre par l'embrasure. | architecture&#10;épanouissement | blooming, fulfillment | Son épanouissement personnel est visible.&#10;soupçon | hint, suspicion | Il y a un soupçon de vanille. | cuisine"
+                        placeholder="amour | love | m | nom | /a.muʁ/ | Je suis tombé amoureux. | tomber amoureux | amoureux, aimer | émotions&#10;feuille | leaf | f | nom | /fœj/ | La feuille tombe. || | nature&#10;épanouissement | blooming | m | nom | | Son épanouissement est visible. | | s'épanouir |"
                         rows="10"
                         required
                         style="font-family: monospace;"
@@ -14414,34 +14424,54 @@ Ils seront préservés lors de l'affichage !"></textarea>
                     return;
                 }
                 
-                const french = parts[0];
-                const meaning = parts[1];
-                const exampleSentence = parts[2] || ''; // NEW: Example sentence (3rd field)
-                const lineTheme = parts[3] || ''; // Theme moved to 4th field
-                const finalTheme = lineTheme || defaultTheme; // Use line theme if present, otherwise default
-                
-                // Detect article
+                // Parse all 9 fields
+                const rawFrench    = parts[0] || '';
+                const meaning      = parts[1] || '';
+                const rawGender    = (parts[2] || '').toLowerCase().trim();
+                const rawWordType  = (parts[3] || '').trim();
+                const ipa          = (parts[4] || '').trim();
+                const example      = (parts[5] || '').trim();
+                const collocations = (parts[6] || '').trim();
+                const wordFamily   = (parts[7] || '').trim();
+                const lineTheme    = (parts[8] || '').trim();
+                const finalTheme   = lineTheme || defaultTheme;
+
+                // Detect and strip article from french word
                 let article = '';
-                let frenchWord = french;
+                let frenchWord = rawFrench.trim();
                 const articles = ['le ', 'la ', "l'", 'les ', 'un ', 'une ', 'des '];
                 for (const art of articles) {
-                    if (french.toLowerCase().startsWith(art)) {
+                    if (frenchWord.toLowerCase().startsWith(art)) {
                         article = art.trim();
-                        frenchWord = french.substring(art.length).trim();
+                        frenchWord = frenchWord.substring(art.length).trim();
                         break;
                     }
                 }
-                
+
+                // Normalise gender
+                const gender = rawGender === 'm' || rawGender === 'masculin' ? 'm'
+                             : rawGender === 'f' || rawGender === 'féminin' || rawGender === 'feminin' ? 'f'
+                             : '';
+
+                // Normalise word type
+                const validTypes = ['nom','verbe','adjectif','adverbe','expression','préposition','conjonction'];
+                const wordType = validTypes.includes(rawWordType.toLowerCase()) ? rawWordType.toLowerCase() : rawWordType;
+
                 const word = {
                     id: Date.now() + imported,
                     french: frenchWord,
                     article: article,
+                    gender: gender,
+                    wordType: wordType,
+                    ipa: ipa,
                     meaning: meaning,
+                    collocations: collocations,
+                    wordFamily: wordFamily,
                     theme: finalTheme,
                     week: week,
                     quarter: quarter,
                     year: year,
-                    contexts: exampleSentence ? [exampleSentence, '', ''] : ['', '', ''], // Use example if provided
+                    contexts: example ? [example, '', ''] : ['', '', ''],
                     note: '',
                     image: '',
                     created: new Date().toISOString(),
