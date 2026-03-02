@@ -6655,8 +6655,27 @@ const firebaseConfig = {
                     <div id="spoken-text" style="min-height: 60px;"></div>
                     
                     <div class="speaking-controls" id="recording-controls" style="display: none;">
-                        <input type="text" class="form-input" id="recording-note" placeholder="Ajoute une note supplémentaire (optionnel)...">
-                        <button class="btn btn-secondary" id="save-recording">Sauvegarder</button>
+                        <button class="btn btn-secondary" id="save-recording" style="display:none;"></button>
+                        <button id="download-recording-btn" onclick="window._downloadCurrentRecording && window._downloadCurrentRecording()" style="
+                            display: inline-flex;
+                            align-items: center;
+                            gap: 0.5rem;
+                            padding: 0.75rem 1.6rem;
+                            background: linear-gradient(135deg, #8b4654, #a35565);
+                            color: white;
+                            border: none;
+                            border-radius: 100px;
+                            font-family: inherit;
+                            font-size: 0.9rem;
+                            font-weight: 500;
+                            cursor: pointer;
+                            box-shadow: 0 2px 10px rgba(139,70,84,0.35);
+                            transition: all 0.2s;
+                            margin-top: 0.5rem;
+                        " onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 4px 16px rgba(139,70,84,0.45)'" onmouseout="this.style.transform='';this.style.boxShadow='0 2px 10px rgba(139,70,84,0.35)'">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+                            Télécharger l'enregistrement
+                        </button>
                     </div>
                 </div>
             </div>
@@ -6669,21 +6688,25 @@ const firebaseConfig = {
                     <a href="https://drive.google.com/drive/folders/1j2gIFik8gKffErklwFly6CCpmEUuGU0d" target="_blank" style="
                         display: inline-flex;
                         align-items: center;
-                        gap: 0.6rem;
-                        padding: 0.75rem 1.5rem;
-                        background: white;
-                        border: 1.5px solid #e2e8f0;
+                        gap: 0.65rem;
+                        padding: 0.8rem 1.8rem;
+                        background: linear-gradient(135deg, #fff 60%, #f0f4ff 100%);
+                        border: 1.5px solid #d4d9f5;
                         border-radius: 100px;
                         font-family: inherit;
                         font-size: 0.88rem;
-                        font-weight: 500;
-                        color: #1B2B4B;
+                        font-weight: 600;
+                        color: #3b4a8a;
                         text-decoration: none;
-                        box-shadow: 0 1px 4px rgba(0,0,0,0.07);
-                        transition: box-shadow 0.2s, border-color 0.2s;
-                    " onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,0.12)';this.style.borderColor='#94a3b8'" onmouseout="this.style.boxShadow='0 1px 4px rgba(0,0,0,0.07)';this.style.borderColor='#e2e8f0'">
-                        <svg width="18" height="18" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg"><path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/><path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47"/><path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/><path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/><path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/><path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/></svg>
-                        Ouvrir mes enregistrements sur Drive
+                        box-shadow: 0 2px 12px rgba(66,100,251,0.10), 0 1px 3px rgba(0,0,0,0.06);
+                        transition: all 0.25s cubic-bezier(.4,0,.2,1);
+                        letter-spacing: 0.01em;
+                    " onmouseover="this.style.boxShadow='0 6px 22px rgba(66,100,251,0.18), 0 2px 6px rgba(0,0,0,0.07)';this.style.transform='translateY(-2px)';this.style.borderColor='#b0b8ef'" onmouseout="this.style.boxShadow='0 2px 12px rgba(66,100,251,0.10), 0 1px 3px rgba(0,0,0,0.06)';this.style.transform='';this.style.borderColor='#d4d9f5'">
+                        <span style="display:flex;align-items:center;justify-content:center;width:28px;height:28px;background:linear-gradient(135deg,#e8eeff,#f5f7ff);border-radius:50%;box-shadow:0 1px 4px rgba(66,100,251,0.12)">
+                            <svg width="16" height="14" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg"><path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/><path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47"/><path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/><path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/><path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/><path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/></svg>
+                        </span>
+                        <span>Mes enregistrements sur Drive</span>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#8a9acf" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                     </a>
                     <p style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.5rem;">Les fichiers téléchargés automatiquement s'y glissent en un clic</p>
                 </div>
@@ -6976,6 +6999,31 @@ const firebaseConfig = {
                     </select>
                 </div>
 
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+                    <div class="form-group">
+                        <label class="form-label">Niveau CEFR (optionnel)</label>
+                        <select class="form-select" id="cefr-input">
+                            <option value="">—</option>
+                            <option value="A1">A1 — Débutant</option>
+                            <option value="A2">A2 — Élémentaire</option>
+                            <option value="B1">B1 — Intermédiaire</option>
+                            <option value="B2">B2 — Intermédiaire sup.</option>
+                            <option value="C1">C1 — Avancé</option>
+                            <option value="C2">C2 — Maîtrise</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Registre (optionnel)</label>
+                        <select class="form-select" id="register-input">
+                            <option value="">—</option>
+                            <option value="soutenu">Soutenu ✍️</option>
+                            <option value="courant">Courant 💬</option>
+                            <option value="familier">Familier 😊</option>
+                            <option value="argot">Argot 🤙</option>
+                        </select>
+                    </div>
+                </div>
+
                 <div class="form-group">
                     <label class="form-label">Collocations (optionnel)</label>
                     <input type="text" class="form-input" id="collocations-input" placeholder="ex: avoir peur, mourir de peur, une peur bleue">
@@ -7155,6 +7203,31 @@ const firebaseConfig = {
                         <option value="préposition">Préposition</option>
                         <option value="conjonction">Conjonction</option>
                     </select>
+                </div>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+                    <div class="form-group">
+                        <label class="form-label">Niveau CEFR (optionnel)</label>
+                        <select class="form-select" id="edit-cefr-input">
+                            <option value="">—</option>
+                            <option value="A1">A1 — Débutant</option>
+                            <option value="A2">A2 — Élémentaire</option>
+                            <option value="B1">B1 — Intermédiaire</option>
+                            <option value="B2">B2 — Intermédiaire sup.</option>
+                            <option value="C1">C1 — Avancé</option>
+                            <option value="C2">C2 — Maîtrise</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Registre (optionnel)</label>
+                        <select class="form-select" id="edit-register-input">
+                            <option value="">—</option>
+                            <option value="soutenu">Soutenu ✍️</option>
+                            <option value="courant">Courant 💬</option>
+                            <option value="familier">Familier 😊</option>
+                            <option value="argot">Argot 🤙</option>
+                        </select>
+                    </div>
                 </div>
 
                 <div class="form-group">
@@ -9506,9 +9579,10 @@ Ils seront préservés lors de l'affichage !"></textarea>
                 <div class="srs-progress-text">${currentSRSIndex + 1} / ${currentSRSSession.length} cartes</div>
                 <div class="srs-card-container" id="srs-card">
                     <div class="srs-card-word">${word.french}</div>
+                    ${word.ipa ? `<div style="font-family:serif;font-size:0.95rem;color:var(--text-soft);margin-top:0.3rem;letter-spacing:0.05em;">${word.ipa}</div>` : ''}
                     <button class="btn btn-primary" onclick="revealSRSAnswer(event)" style="margin: 1.5rem 0;">Voir la réponse</button>
-                    <div class="srs-card-translation">${word.english}</div>
-                    ${word.example ? `<div class="srs-card-example">${word.example}</div>` : ''}
+                    <div class="srs-card-translation">${word.meaning || word.english || '—'}</div>
+                    ${word.contexts && word.contexts[0] ? `<div class="srs-card-example">${word.contexts[0]}</div>` : word.context ? `<div class="srs-card-example">${word.context}</div>` : ''}
                     <div class="srs-difficulty-buttons">
                         <button class="srs-diff-btn again" onclick="rateSRSCard(0)">
                             <div>❌ À revoir</div>
@@ -10837,6 +10911,8 @@ Ils seront préservés lors de l'affichage !"></textarea>
                         ${word.week ? `<div class="category-tag time">Semaine ${word.week}</div>` : ''}
                         ${word.quarter ? `<div class="category-tag time">${word.quarter}</div>` : ''}
                         ${word.year ? `<div class="category-tag time">${word.year}</div>` : ''}
+                        ${word.cefr ? `<div class="category-tag" style="background:${word.cefr==='A1'||word.cefr==='A2'?'rgba(74,165,74,0.12)':word.cefr==='B1'||word.cefr==='B2'?'rgba(74,111,165,0.12)':'rgba(139,38,53,0.1)'};color:${word.cefr==='A1'||word.cefr==='A2'?'#2d7a2d':word.cefr==='B1'||word.cefr==='B2'?'#3a5f9a':'#8b2635'};border:1px solid ${word.cefr==='A1'||word.cefr==='A2'?'rgba(74,165,74,0.3)':word.cefr==='B1'||word.cefr==='B2'?'rgba(74,111,165,0.3)':'rgba(139,38,53,0.25)'};font-weight:600;letter-spacing:0.04em;">${word.cefr}</div>` : ''}
+                        ${word.register ? `<div class="category-tag" style="background:rgba(201,168,97,0.12);color:#8a6914;border:1px solid rgba(201,168,97,0.3);font-style:italic;">${word.register==='soutenu'?'✍️ soutenu':word.register==='familier'?'😊 familier':word.register==='argot'?'🤙 argot':'💬 courant'}</div>` : ''}
                     </div>
                     
                     <div class="word-french">${word.french}</div>
@@ -11074,6 +11150,8 @@ Ils seront préservés lors de l'affichage !"></textarea>
             document.getElementById('edit-collocations-input').value = word.collocations || '';
             document.getElementById('edit-wordfamily-input').value = word.wordFamily || '';
             document.getElementById('edit-ipa-input').value = word.ipa || '';
+            document.getElementById('edit-cefr-input').value = word.cefr || '';
+            document.getElementById('edit-register-input').value = word.register || '';
 
             if (word.image) {
                 const preview = document.getElementById('edit-word-image-preview');
@@ -11133,6 +11211,8 @@ Ils seront préservés lors de l'affichage !"></textarea>
                 collocations: document.getElementById('collocations-input').value.trim() || '',
                 wordFamily: document.getElementById('wordfamily-input').value.trim() || '',
                 ipa: document.getElementById('ipa-input').value.trim() || '',
+                cefr: document.getElementById('cefr-input').value || '',
+                register: document.getElementById('register-input').value || '',
                 image: imagePreview.style.display !== 'none' ? imagePreview.src : null,
                 created: new Date().toISOString()
             };
@@ -11200,6 +11280,8 @@ Ils seront préservés lors de l'affichage !"></textarea>
                 collocations: document.getElementById('edit-collocations-input').value.trim() || '',
                 wordFamily: document.getElementById('edit-wordfamily-input').value.trim() || '',
                 ipa: document.getElementById('edit-ipa-input').value.trim() || '',
+                cefr: document.getElementById('edit-cefr-input').value || '',
+                register: document.getElementById('edit-register-input').value || '',
                 image: imagePreview.style.display !== 'none' ? imagePreview.src : vocabulary[index].image
             };
 
@@ -13212,22 +13294,28 @@ Ils seront préservés lors de l'affichage !"></textarea>
                             const audioURL = URL.createObjectURL(compressedBlob);
                             currentRecording = compressedBlob; // Store blob instead of base64!
 
-                            // ── Auto-download the recording ──────────────────
+                            // ── Helper: download the recording ───────────────
                             const now = new Date();
                             const dateStr = now.toISOString().slice(0,10);
                             const timeStr = now.toTimeString().slice(0,5).replace(':','-');
                             const filename = `parole_${dateStr}_${timeStr}.webm`;
-                            const downloadLink = document.createElement('a');
-                            downloadLink.href = audioURL;
-                            downloadLink.download = filename;
-                            downloadLink.click();
+
+                            window._downloadCurrentRecording = function() {
+                                const link = document.createElement('a');
+                                link.href = audioURL;
+                                link.download = filename;
+                                link.click();
+                            };
+
+                            // Auto-download on stop
+                            window._downloadCurrentRecording();
                             
                             spokenText.innerHTML = `
                                 <audio controls style="width: 100%; margin-top: 1rem;">
-                                    <source src="${audioURL}" type="audio/wav">
+                                    <source src="${audioURL}" type="audio/webm">
                                 </audio>
                                 <p style="font-size: 0.85rem; color: var(--text); margin-top: 0.5rem;">
-                                    📊 Taille: ${(compressedBlob.size / 1024).toFixed(0)} KB · 💾 Téléchargé automatiquement
+                                    📊 Taille: ${(compressedBlob.size / 1024).toFixed(0)} KB · 💾 Téléchargé automatiquement sur ton appareil
                                 </p>
                             `;
                             controls.style.display = 'flex';
@@ -14384,7 +14472,13 @@ Ils seront préservés lors de l'affichage !"></textarea>
                 doc.text(wordText, margin, y);
                 y += 7;
                 
-                // Meaning - THE IMPORTANT PART
+                // Meaning + IPA
+                if (word.ipa) {
+                    doc.setFontSize(9);
+                    doc.setTextColor(107, 97, 92);
+                    doc.text(cleanText(word.ipa), margin + 5, y);
+                    y += 5;
+                }
                 if (word.meaning) {
                     doc.setFontSize(11);
                     doc.setTextColor(42, 37, 32); // text
@@ -14395,6 +14489,8 @@ Ils seront préservés lors de l'affichage !"></textarea>
                 
                 // Categories on same line
                 const categories = [];
+                if (word.cefr) categories.push(word.cefr);
+                if (word.register) categories.push(cleanText(word.register));
                 if (word.theme) categories.push(cleanText(word.theme));
                 if (word.week) categories.push(`S${word.week}`);
                 if (word.quarter) categories.push(cleanText(word.quarter));
@@ -14514,7 +14610,7 @@ Ils seront préservés lors de l'affichage !"></textarea>
             };
 
             // CSV Header - all fields
-            const csvHeaders = ['french','article','gender','wordType','ipa','meaning','collocations','wordFamily','context_neutral','context_emotional','context_idiomatic','context','theme','week','quarter','year','note','favorite'];
+            const csvHeaders = ['french','article','gender','wordType','ipa','cefr','register','meaning','collocations','wordFamily','context_neutral','context_emotional','context_idiomatic','context','theme','week','quarter','year','note','favorite'];
             let csvContent = csvHeaders.join(',') + '\n';
             
             // Add each word
@@ -14526,6 +14622,8 @@ Ils seront préservés lors de l'affichage !"></textarea>
                     word.wordType || '',
                     word.meaning || '',
                     word.ipa || '',
+                    word.cefr || '',
+                    word.register || '',
                     word.collocations || '',
                     word.wordFamily || '',
                     (word.contexts && word.contexts[0]) ? word.contexts[0] : '',
