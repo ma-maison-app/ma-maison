@@ -13286,11 +13286,10 @@ Ils seront préservés lors de l'affichage !"></textarea>
                             audioChunks.push(event.data);
                         };
                         
-                        mediaRecorder.onstop = async () => {
+                        mediaRecorder.onstop = () => {
                             const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                            const compressedBlob = await compressAudio(audioBlob);
-                            const audioURL = URL.createObjectURL(compressedBlob);
-                            currentRecording = compressedBlob;
+                            const audioURL = URL.createObjectURL(audioBlob);
+                            currentRecording = audioBlob;
 
                             const now = new Date();
                             const dateStr = now.toISOString().slice(0,10);
@@ -13301,26 +13300,25 @@ Ils seront préservés lors de l'affichage !"></textarea>
                                 const link = document.createElement('a');
                                 link.href = audioURL;
                                 link.download = filename;
+                                document.body.appendChild(link);
                                 link.click();
+                                document.body.removeChild(link);
                             };
 
-                            // Wire up the audio player
+                            // Wire up player
                             const player = document.getElementById('recording-player');
-                            if (player) player.src = audioURL;
+                            if (player) { player.src = audioURL; }
 
                             // Show size
                             const sizeEl = document.getElementById('recording-size');
-                            if (sizeEl) sizeEl.textContent = `${(compressedBlob.size / 1024).toFixed(0)} KB`;
+                            if (sizeEl) sizeEl.textContent = `${(audioBlob.size / 1024).toFixed(0)} KB`;
 
-                            // Show result area, hide indicator
+                            // Show result, hide indicator
                             const resultDiv = document.getElementById('recording-result');
                             if (resultDiv) resultDiv.style.display = 'block';
                             indicator.style.display = 'none';
 
-                            // Auto-download
-                            window._downloadCurrentRecording();
-
-                            // Stop all tracks
+                            // Stop mic
                             stream.getTracks().forEach(track => track.stop());
                         };
                         
