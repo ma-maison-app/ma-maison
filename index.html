@@ -359,11 +359,25 @@ const FirebaseREST = {
             body: audioBlob
         });
 
+        if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`Firebase Storage upload failed (${response.status}): ${errText}`);
+        }
+
         const result = await response.json();
+        console.log('📦 Firebase Storage upload response:', JSON.stringify(result).substring(0, 300));
         if (result.error) throw new Error(result.error.message || JSON.stringify(result.error));
 
-        // Build the public download URL with auth token
-        const downloadUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodedPath}?alt=media&token=${result.downloadTokens}`;
+        // Firebase Storage REST returns the token in result.downloadTokens
+        // Build authenticated download URL - token may be in downloadTokens or metadata
+        const token = result.downloadTokens || (result.metadata && result.metadata.firebaseStorageDownloadTokens);
+        let downloadUrl;
+        if (token) {
+            downloadUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodedPath}?alt=media&token=${token}`;
+        } else {
+            // Fallback: use the authenticated URL (requires auth to play back)
+            downloadUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodedPath}?alt=media`;
+        }
         console.log('✅ Audio uploaded to Firebase Storage:', downloadUrl);
         return downloadUrl;
     },
@@ -10313,6 +10327,94 @@ Ils seront préservés lors de l'affichage !"></textarea>
             setInterval(showAffirmation, 180000);
         }, 30000);
 
+
+        // ============================================
+        // AUTO JSON BACKUP — every 30 minutes
+        // Saves a full JSON snapshot to Firebase under users/{uid}/backups/{timestamp}
+        // Also triggers a browser download every 2 hours as extra safety
+        // ============================================
+        let _lastAutoBackup = 0;
+        let _autoBackupDownloadCount = 0;
+
+        async function runAutoBackup() {
+            if (!window.currentUser || !window.firebaseReady) return;
+            const now = Date.now();
+            if (now - _lastAutoBackup < 25 * 60 * 1000) return; // debounce
+            _lastAutoBackup = now;
+
+            const snapshot = {
+                vocabulary,
+                writings,
+                readingList,
+                listeningList,
+                recordings,
+                resourcesList,
+                notes,
+                presenceData,
+                readingPassages: readingPassages || [],
+                mistakeCorrections: mistakeCorrections || [],
+                transcriptWordStatus: window.transcriptWordStatus || {},
+                readingTranscripts: readingTranscripts || [],
+                listeningTranscripts: listeningTranscripts || [],
+                listeningPlaybackPositions: listeningPlaybackPositions || {},
+                backupDate: new Date().toISOString(),
+                vocabCount: vocabulary?.length || 0,
+                autoBackup: true
+            };
+
+            // Skip useless empty backups
+            if ((snapshot.vocabCount || 0) === 0 && (snapshot.writings?.length || 0) === 0) {
+                console.log('⏭️ Auto-backup skipped: no data to save');
+                return;
+            }
+
+            try {
+                // Save to Firebase as a backup document
+                const { doc, setDoc } = window.firebaseModules;
+                const backupKey = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
+                await setDoc(
+                    doc(window.firebaseDB, 'users', window.currentUser.uid, 'backups', backupKey),
+                    snapshot
+                );
+                console.log(`✅ Auto-backup saved to Firebase: backups/${backupKey} (${snapshot.vocabCount} mots)`);
+
+                // Show subtle toast
+                const toast = document.createElement('div');
+                toast.textContent = `💾 Sauvegarde auto (${snapshot.vocabCount} mots)`;
+                toast.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#2d6a4f;color:white;padding:8px 16px;border-radius:20px;font-size:13px;z-index:9999;opacity:0;transition:opacity 0.4s';
+                document.body.appendChild(toast);
+                requestAnimationFrame(() => { toast.style.opacity = '1'; });
+                setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 400); }, 3000);
+
+            } catch (err) {
+                console.warn('⚠️ Auto-backup to Firebase failed:', err);
+            }
+
+            // Every 2 hours, also trigger a browser download as a local file backup
+            _autoBackupDownloadCount++;
+            if (_autoBackupDownloadCount % 4 === 0) {
+                try {
+                    const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `ma-maison-auto-${new Date().toISOString().split('T')[0]}.json`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    console.log('📥 Auto-backup also downloaded locally');
+                } catch (e) { /* silent */ }
+            }
+        }
+
+        // Run first backup after 5 minutes, then every 30 minutes
+        setTimeout(() => {
+            runAutoBackup();
+            setInterval(runAutoBackup, 30 * 60 * 1000);
+        }, 5 * 60 * 1000);
+
+        // Also expose it globally so you can trigger manually in console: runAutoBackup()
+        window.runAutoBackup = runAutoBackup;
+
         // ============================================
         // HOUSE MAGIC - FLOATING HEARTS & MOTIVATION
         // ============================================
@@ -13152,7 +13254,14 @@ Ils seront préservés lors de l'affichage !"></textarea>
                     audioURL = await FirebaseREST.uploadAudio(filePath, audioBlob);
                     console.log('✅ Audio uploaded to Firebase Storage');
                 } catch (error) {
-                    console.error('❌ Firebase Storage upload failed, falling back to IndexedDB:', error);
+                    console.error('❌ Firebase Storage upload failed:', error);
+                    // Show the actual error so we know what's happening
+                    const errMsg = error.message || String(error);
+                    const toast = document.createElement('div');
+                    toast.textContent = `⚠️ Upload Firebase échoué: ${errMsg.substring(0, 80)}`;
+                    toast.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#c0392b;color:white;padding:10px 18px;border-radius:8px;font-size:13px;z-index:9999;max-width:90vw;text-align:center';
+                    document.body.appendChild(toast);
+                    setTimeout(() => toast.remove(), 6000);
                 }
             }
 
