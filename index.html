@@ -329,8 +329,12 @@ const FirebaseREST = {
         });
         const data = await response.json();
         if (data.error) {
-            await this.signOut();
-            throw new Error('Session expired');
+            // ✅ CRITICAL FIX: Do NOT call signOut() here.
+            // signOut() fires _authCallback(null) → wipes vocabulary/recordings from memory
+            // → then syncToFirebase saves empty data to Firebase = DATA WIPE.
+            // Instead, just throw so the operation fails silently. Data stays in memory.
+            console.warn('⚠️ Token refresh failed. Keeping data in memory. User should re-login.', data.error.message);
+            throw new Error('Session expired - please re-login manually');
         }
         this.currentUser.token = data.id_token;
         this.currentUser.refreshToken = data.refresh_token;
@@ -426,7 +430,11 @@ const firebaseConfig = {
                     }
                 } catch (error) {
                     console.warn('⚠️ Error checking stored user:', error);
-                    callback(null);
+                    // ✅ CRITICAL FIX: Do NOT call callback(null) on error.
+                    // callback(null) triggers loadFromLocalStorage() which empties all arrays,
+                    // then syncToFirebase() can wipe Firebase with empty data.
+                    // If we can't confirm the user, just do nothing — data stays safe.
+                    console.warn('⚠️ Auth check failed silently. Data NOT wiped.');
                 }
                 
                 // Listen for changes
@@ -8542,17 +8550,28 @@ Ils seront préservés lors de l'affichage !"></textarea>
             const syncIndicator = document.getElementById('sync-indicator');
             if (syncIndicator) syncIndicator.style.opacity = '1';
             
-            // ✅ SAFETY GUARD: Never overwrite Firebase with empty data.
-            // This prevents race conditions (saving before load finishes) from wiping everything.
+            // ✅ SAFETY GUARD: Never overwrite Firebase with less data than we already have.
+            // This prevents race conditions AND token-expiry wipes.
             const _totalItems = (vocabulary?.length || 0) + (readingList?.length || 0) +
                                 (writings?.length || 0) + (listeningList?.length || 0) +
                                 (recordings?.length || 0) + (notes?.length || 0) +
                                 (readingPassages?.length || 0) + (resourcesList?.length || 0) +
                                 Object.keys(presenceData || {}).length;
             if (_totalItems === 0 && !window._allowEmptySave) {
-                console.warn('⚠️ SAFETY GUARD: Refusing to save - all data is empty. Possible race condition or accidental reset. Set window._allowEmptySave=true to override.');
+                console.warn('⚠️ SAFETY GUARD: Refusing to save - all data is empty. Set window._allowEmptySave=true to override.');
                 if (syncIndicator) syncIndicator.style.opacity = '0';
                 return;
+            }
+            // ✅ EXTRA GUARD: If vocabulary specifically is empty but we know we had words before,
+            // refuse to save. vocabulary is the most critical data.
+            if ((vocabulary?.length || 0) === 0 && window._lastKnownVocabCount > 0 && !window._allowEmptySave) {
+                console.warn('⚠️ SAFETY GUARD: Vocabulary is empty but we had', window._lastKnownVocabCount, 'words. Refusing to save to prevent data wipe.');
+                if (syncIndicator) syncIndicator.style.opacity = '0';
+                return;
+            }
+            // Track how many words we had so the guard above works
+            if ((vocabulary?.length || 0) > 0) {
+                window._lastKnownVocabCount = vocabulary.length;
             }
             
             try {
@@ -15914,6 +15933,8 @@ Ils seront préservés lors de l'affichage !"></textarea>
                         vocabulary = data.vocabulary;
                         loadImagesFromLocalStorage(); // Merge images back
                         console.log('✅ Loaded', vocabulary.length, 'vocabulary items');
+                        // ✅ Set safety guard baseline so we never accidentally save fewer words
+                        window._lastKnownVocabCount = vocabulary.length;
                     }
                     
                     if (data.readingList) {
