@@ -6578,6 +6578,10 @@ const firebaseConfig = {
                 <p class="room-description">
                     Réponds aux questions. Enregistre ta voix. Personne ne juge.
                 </p>
+                <button id="parloir-checkin-btn" onclick="parlourCheckIn()" title="Marquer comme fait aujourd'hui" style="margin-top:0.6rem;display:inline-flex;align-items:center;gap:0.4rem;background:none;border:1px solid rgba(42,37,32,0.18);border-radius:20px;padding:0.3rem 0.85rem;font-size:0.78rem;font-family:'Work Sans',sans-serif;color:var(--text-soft);cursor:pointer;transition:all 0.2s;">
+                    <svg id="parloir-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:14px;height:14px;"><polyline points="20 6 9 17 4 12"/></svg>
+                    <span id="parloir-checkin-label">J'ai pratiqué aujourd'hui</span>
+                </button>
             </div>
 
             <!-- Resources Dropdown -->
@@ -18459,6 +18463,33 @@ Peux-tu ajouter des timestamps réalistes au début de chaque ligne ? Format: [M
             closeWordAnalysisPopup();
         }
 
+
+        function parlourCheckIn() {
+            logAction('speaking');
+            const btn = document.getElementById('parloir-checkin-btn');
+            const label = document.getElementById('parloir-checkin-label');
+            const icon = document.getElementById('parloir-check-icon');
+            if (btn) {
+                btn.style.borderColor = '#A64253';
+                btn.style.color = '#A64253';
+                btn.style.background = 'rgba(166,66,83,0.07)';
+            }
+            if (label) label.textContent = 'Pratique enregistrée ✓';
+            if (icon) icon.setAttribute('stroke', '#A64253');
+        }
+
+        function updateParlourCheckInUI() {
+            const today = new Date().toISOString().split('T')[0];
+            const todayData = presenceData[today];
+            if (todayData && todayData.actions && todayData.actions.speaking) {
+                const btn = document.getElementById('parloir-checkin-btn');
+                const label = document.getElementById('parloir-checkin-label');
+                const icon = document.getElementById('parloir-check-icon');
+                if (btn) { btn.style.borderColor = '#A64253'; btn.style.color = '#A64253'; btn.style.background = 'rgba(166,66,83,0.07)'; }
+                if (label) label.textContent = 'Pratique enregistrée ✓';
+                if (icon) icon.setAttribute('stroke', '#A64253');
+            }
+        }
         // ============================================
         // IMAGE HELPERS
         // ============================================
